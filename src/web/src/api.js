@@ -44,6 +44,7 @@ export const api = {
   logout: () => request('logout', { method: 'POST' }),
 
   stats: () => request('stats'),
+  networkMonitor: () => request('monitor/network'),
   files: () => request('files'),
   addFile: (path) => request('files', { method: 'POST', body: { path } }),
   deleteFile: (sha256) => request(`files/${sha256}`, { method: 'DELETE' }),
