@@ -4,6 +4,7 @@ import { getNumber } from '../config/store.js';
 import { generateSessionId } from '../core/code.js';
 import * as loginFailuresRepo from '../db/repos/loginFailures.repo.js';
 import * as sessionsRepo from '../db/repos/sessions.repo.js';
+import { verifyAdminPassword } from './securityService.js';
 
 const CAPTCHA_TTL_MS = 5 * 60 * 1000;
 
@@ -60,8 +61,9 @@ function registerFailure(ip, previousFailures) {
 /**
  * 登录：密码校验 + （首次失败后强制）验证码校验，
  * 连续失败达到阈值即封禁该 IP 一段时间。
+ * 密码校验走 securityService：自定义哈希优先，否则比对启动随机密码。
  */
-export function attemptLogin(req, res, { ip, adminPassword, adminPath, password, captchaText }) {
+export function attemptLogin(req, res, { ip, adminPath, password, captchaText }) {
   const now = Date.now();
   const ban = getBanState(ip, now);
   if (ban.banned) {
@@ -85,7 +87,7 @@ export function attemptLogin(req, res, { ip, adminPassword, adminPath, password,
       errorCode = 'invalid_captcha';
     }
   }
-  if (!errorCode && String(password ?? '') !== String(adminPassword)) errorCode = 'invalid_credentials';
+  if (!errorCode && !verifyAdminPassword(password)) errorCode = 'invalid_credentials';
 
   if (errorCode) {
     const next = registerFailure(ip, ban.failures);

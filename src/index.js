@@ -8,6 +8,13 @@ import { sweepApiWindows } from './core/apiRateLimit.js';
 import { closeDb, initDb } from './db/index.js';
 import { deleteExpiredBans } from './db/repos/loginFailures.repo.js';
 import { deleteExpiredSessions } from './db/repos/sessions.repo.js';
+import {
+  getAdminPath,
+  hasCustomAdminPath,
+  hasCustomPassword,
+  loadSecuritySettings,
+  setRuntimeCredentials,
+} from './services/securityService.js';
 import logger from './utils/logger.js';
 
 /** 6.3 清理过期会话与已结束的封禁记录 */
@@ -26,8 +33,21 @@ function runCleanup() {
 }
 
 /** 6.1 启动凭据打印区块（仅 stdout 明文，不进入常规日志） */
-function printBanner({ listen, dbPath, adminPath, adminPassword, passwordFromEnv }) {
+function printBanner({
+  listen,
+  dbPath,
+  adminPath,
+  adminPathIsCustom,
+  adminPassword,
+  passwordIsCustom,
+  passwordFromEnv,
+}) {
   const line = '─'.repeat(58);
+  let passwordLine;
+  if (passwordIsCustom) passwordLine = '(已自定义，不再随机生成)';
+  else if (passwordFromEnv) passwordLine = `${adminPassword}  (来自环境变量 ADMIN_PASSWORD)`;
+  else passwordLine = adminPassword;
+
   process.stdout.write(
     [
       '',
@@ -36,10 +56,12 @@ function printBanner({ listen, dbPath, adminPath, adminPassword, passwordFromEnv
       line,
       `  监听地址     : ${listen}`,
       `  数据库       : ${dbPath}`,
-      `  管理后台路径 : ${adminPath}`,
-      `  管理员密码   : ${adminPassword}${passwordFromEnv ? '  (来自环境变量 ADMIN_PASSWORD)' : ''}`,
+      `  管理后台路径 : ${adminPath}${adminPathIsCustom ? '  (自定义)' : ''}`,
+      `  管理员密码   : ${passwordLine}`,
       line,
-      '  以上凭据仅在本次运行期间有效，重启后会重新生成。',
+      adminPathIsCustom || passwordIsCustom
+        ? '  已启用后台保存的自定义安全设置，未配置的项才会随机生成。'
+        : '  以上凭据仅在本次运行期间有效，重启后会重新生成。',
       line,
       '',
       '',
@@ -58,21 +80,37 @@ function main() {
   const host = parseHost(argv, process.env);
   const dbPath = process.env.DB_PATH ? resolve(process.env.DB_PATH) : resolve(process.cwd(), DEFAULT_DB_PATH);
 
-  // 6.2 建表 + 配置装载
+  // 6.2 建表 + 配置装载 + 安全设置装载
   initDb(dbPath);
   loadConfig();
+  loadSecuritySettings();
+
+  // 先注入本次运行的随机凭据，再用它们作为「未自定义」时的兜底
+  const generatedPath = `/${ADMIN_PATH_PREFIX}${generateAdminPathSuffix()}`;
+  const generatedPassword = process.env.ADMIN_PASSWORD || generateAdminPassword();
+  setRuntimeCredentials({ adminPath: generatedPath, password: generatedPassword });
+
+  const adminPathIsCustom = hasCustomAdminPath();
+  const passwordIsCustom = hasCustomPassword();
+  const adminPath = getAdminPath();
+  const passwordFromEnv = !passwordIsCustom && Boolean(process.env.ADMIN_PASSWORD);
 
   const sessionSecret = generateSecret();
-  const adminPath = `/${ADMIN_PATH_PREFIX}${generateAdminPathSuffix()}`;
-  const passwordFromEnv = Boolean(process.env.ADMIN_PASSWORD);
-  const adminPassword = process.env.ADMIN_PASSWORD || generateAdminPassword();
 
   runCleanup();
 
-  const app = createApp({ sessionSecret, adminPath, adminPassword });
+  const app = createApp({ sessionSecret });
   const server = app.listen(port, host, () => {
     const listen = `${host}:${port}`;
-    printBanner({ listen, dbPath, adminPath, adminPassword, passwordFromEnv });
+    printBanner({
+      listen,
+      dbPath,
+      adminPath,
+      adminPathIsCustom,
+      adminPassword: generatedPassword,
+      passwordIsCustom,
+      passwordFromEnv,
+    });
     logger.info(`server listening on http://${listen}`);
     logger.info(`admin console available at ${adminPath}`);
   });
