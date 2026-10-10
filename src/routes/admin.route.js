@@ -1,12 +1,14 @@
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import express, { Router } from 'express';
+import { SESSION_COOKIE } from '../config/constants.js';
 import * as configStore from '../config/store.js';
 import * as blacklistRepo from '../db/repos/blacklist.repo.js';
 import { requireAuth } from '../middleware/adminAuth.js';
 import { attemptLogin, destroySession, issueCaptcha, readSession } from '../services/authService.js';
 import { invalidateCache, listDirectory } from '../services/directoryService.js';
 import { addFileByPath, removeFile } from '../services/fileService.js';
+import * as securityService from '../services/securityService.js';
 import { getStats, listFilesWithLinks, refreshLink } from '../services/linkService.js';
 import { isIpAddress, isSha256, normalizeSha256, toNonNegativeInt } from '../utils/validate.js';
 
@@ -38,11 +40,11 @@ function updateLimits(body) {
   return { updated: Object.keys(updates) };
 }
 
-export function createAdminRouter({ adminPath, adminPassword }) {
+export function createAdminRouter() {
   const router = Router();
   const webDist = resolve(process.cwd(), 'dist', 'admin');
   const indexPath = join(webDist, 'index.html');
-  const auth = requireAuth(adminPath);
+  const auth = requireAuth();
 
   router.use(express.json({ limit: '32kb' }));
 
@@ -50,21 +52,20 @@ export function createAdminRouter({ adminPath, adminPassword }) {
   router.post('/api/login', (req, res) => {
     const result = attemptLogin(req, res, {
       ip: req.clientIp,
-      adminPassword,
-      adminPath,
+      adminPath: req.adminBasePath,
       password: req.body?.password,
       captchaText: req.body?.captcha,
     });
     res.status(result.status).json(result.body);
   });
 
-  router.get('/api/captcha', (_req, res) => {
-    const svg = issueCaptcha(res, adminPath);
+  router.get('/api/captcha', (req, res) => {
+    const svg = issueCaptcha(res, req.adminBasePath);
     res.type('image/svg+xml').set('Cache-Control', 'no-store').send(svg);
   });
 
   router.post('/api/logout', (req, res) => {
-    destroySession(req, res, adminPath);
+    destroySession(req, res, req.adminBasePath);
     res.json({ ok: true });
   });
 
@@ -156,6 +157,58 @@ export function createAdminRouter({ adminPath, adminPassword }) {
       return;
     }
     res.json({ ok: true, config: configStore.snapshot() });
+  });
+
+  // ---- 安全设置：自定义安全入口与登录密码 ----
+  router.get('/api/security', (req, res) => {
+    res.json({
+      adminPath: securityService.getAdminPath(),
+      currentPath: req.adminBasePath,
+      customAdminPath: securityService.hasCustomAdminPath(),
+      customPassword: securityService.hasCustomPassword(),
+    });
+  });
+
+  router.put('/api/security/path', (req, res) => {
+    const previousPath = req.adminBasePath ?? '';
+    const result = securityService.setAdminPath(req.body?.path);
+    if (result.error) {
+      res.status(400).json({ error: 'invalid_path', message: result.error });
+      return;
+    }
+
+    // 让当前会话 cookie 跟随新入口，改完不会被登出
+    const sessionId = req.signedCookies?.[SESSION_COOKIE];
+    const expiresAt = req.adminSession?.expiresAt;
+    if (sessionId && expiresAt) {
+      res.clearCookie(SESSION_COOKIE, { path: previousPath });
+      res.cookie(SESSION_COOKIE, sessionId, {
+        signed: true,
+        httpOnly: true,
+        sameSite: 'strict',
+        path: result.path,
+        maxAge: Math.max(expiresAt - Date.now(), 1000),
+      });
+    }
+    res.json({ ok: true, adminPath: result.path });
+  });
+
+  router.put('/api/security/password', (req, res) => {
+    const { currentPassword, newPassword, confirmPassword } = req.body ?? {};
+    if (!securityService.verifyAdminPassword(currentPassword)) {
+      res.status(400).json({ error: 'invalid_current_password', message: '当前密码不正确' });
+      return;
+    }
+    if (String(newPassword ?? '') !== String(confirmPassword ?? '')) {
+      res.status(400).json({ error: 'password_mismatch', message: '两次输入的新密码不一致' });
+      return;
+    }
+    const result = securityService.setPassword(newPassword);
+    if (result.error) {
+      res.status(400).json({ error: 'weak_password', message: result.error });
+      return;
+    }
+    res.json({ ok: true });
   });
 
   // ---- 静态资源与 SPA 入口 ----

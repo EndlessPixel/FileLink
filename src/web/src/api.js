@@ -60,6 +60,10 @@ export const api = {
   config: () => request('config'),
   saveConfig: (payload) => request('config', { method: 'PUT', body: payload }),
 
+  security: () => request('security'),
+  updateAdminPath: (path) => request('security/path', { method: 'PUT', body: { path } }),
+  updatePassword: (payload) => request('security/password', { method: 'PUT', body: payload }),
+
   captchaUrl: () => `${toUrl('captcha')}?t=${Date.now()}`,
 };
 
