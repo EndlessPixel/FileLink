@@ -31,6 +31,9 @@ export const THROTTLE_TICK_MS = 100;
 /** 默认监听端口 */
 export const DEFAULT_PORT = 3000;
 
+/** 默认监听地址（0.0.0.0 表示所有网卡，反向代理场景可设为 127.0.0.1） */
+export const DEFAULT_HOST = '0.0.0.0';
+
 /** 默认数据库路径（相对项目根目录） */
 export const DEFAULT_DB_PATH = 'data/filelink.db';
 
