@@ -33,6 +33,7 @@ npm test          # 单元与集成测试（node:test）
 | 环境变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `PORT` | `3000` | 监听端口，也可用 `--port=3000` 或 `--port 3000` |
+| `HOST` | `0.0.0.0` | 监听地址，反向代理场景建议设为 `127.0.0.1`，也可用 `--host=127.0.0.1` |
 | `DB_PATH` | `data/filelink.db` | SQLite 数据文件路径 |
 | `ADMIN_PASSWORD` | 随机生成 | 固定管理员密码，便于部署 |
 | `PUBLIC_BASE_URL` | 按请求头推断 | API 返回下载链接时使用的基址，如 `https://dl.example.com` |
