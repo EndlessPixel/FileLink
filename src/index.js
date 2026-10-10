@@ -2,12 +2,14 @@ import { resolve } from 'node:path';
 import { createApp } from './app.js';
 import { isValidPort, parseHost, parsePort } from './config/cli.js';
 import { ADMIN_PATH_PREFIX, CLEANUP_INTERVAL_MS, DEFAULT_DB_PATH } from './config/constants.js';
-import { loadConfig } from './config/store.js';
+import { getNumber, loadConfig } from './config/store.js';
 import { generateAdminPassword, generateAdminPathSuffix, generateSecret } from './core/code.js';
 import { sweepApiWindows } from './core/apiRateLimit.js';
 import { closeDb, initDb } from './db/index.js';
+import { deleteLogsBefore } from './db/repos/accessLogs.repo.js';
 import { deleteExpiredBans } from './db/repos/loginFailures.repo.js';
 import { deleteExpiredSessions } from './db/repos/sessions.repo.js';
+import { startAccessLogWriter, stopAccessLogWriter } from './services/accessLogService.js';
 import { startNetworkMonitor, stopNetworkMonitor } from './services/networkMonitor.js';
 import {
   getAdminPath,
@@ -18,15 +20,24 @@ import {
 } from './services/securityService.js';
 import logger from './utils/logger.js';
 
-/** 6.3 清理过期会话与已结束的封禁记录 */
+/** 6.3 清理过期会话、已结束的封禁记录与超期访问日志 */
 function runCleanup() {
   const now = Date.now();
   try {
     const sessions = deleteExpiredSessions(now);
     const bans = deleteExpiredBans(now);
     sweepApiWindows(now);
-    if (sessions > 0 || bans > 0) {
-      logger.info(`cleanup done: ${sessions} session(s), ${bans} ban record(s) removed`);
+
+    const retentionDays = getNumber('log_retention_days');
+    const logs =
+      retentionDays > 0
+        ? deleteLogsBefore(now - retentionDays * 24 * 60 * 60 * 1000)
+        : 0;
+
+    if (sessions > 0 || bans > 0 || logs > 0) {
+      logger.info(
+        `cleanup done: ${sessions} session(s), ${bans} ban record(s), ${logs} access log(s) removed`
+      );
     }
   } catch (err) {
     logger.error('cleanup failed:', err);
@@ -103,6 +114,9 @@ function main() {
   // 网卡流量采样（仅 Linux 可用，失败不影响主流程）
   startNetworkMonitor().catch((err) => logger.warn(`network monitor unavailable: ${err.message}`));
 
+  // 访问日志批量写入器（内存队列 + 定时刷盘）
+  startAccessLogWriter();
+
   const app = createApp({ sessionSecret });
   const server = app.listen(port, host, () => {
     const listen = `${host}:${port}`;
@@ -133,6 +147,7 @@ function main() {
     logger.info(`received ${signal}, shutting down`);
     clearInterval(cleanupTimer);
     stopNetworkMonitor();
+    stopAccessLogWriter();
     server.close(() => {
       closeDb();
       process.exit(0);

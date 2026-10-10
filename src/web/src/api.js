@@ -61,6 +61,8 @@ export const api = {
   config: () => request('config'),
   saveConfig: (payload) => request('config', { method: 'PUT', body: payload }),
 
+  logs: (params) => request(`logs?${new URLSearchParams(params).toString()}`),
+
   security: () => request('security'),
   updateAdminPath: (path) => request('security/path', { method: 'PUT', body: { path } }),
   updatePassword: (payload) => request('security/password', { method: 'PUT', body: payload }),
@@ -79,6 +81,15 @@ export async function fetchDownloadUrl(sha256) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.message || '获取下载链接失败');
   return data.url;
+}
+
+/** 下载 CSV 导出结果（附带内容与建议文件名） */
+export async function downloadLogsCsv(params) {
+  const response = await fetch(toUrl(`logs/export?${new URLSearchParams(params).toString()}`), {
+    credentials: 'same-origin',
+  });
+  if (!response.ok) throw new Error('导出失败，请稍后重试');
+  return response.blob();
 }
 
 export default api;

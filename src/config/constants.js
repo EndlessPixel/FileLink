@@ -51,6 +51,7 @@ export const DEFAULT_CONFIG = {
   session_ttl_seconds: '43200',
   login_max_failures: '3',
   login_ban_seconds: '300',
+  log_retention_days: '30',
 };
 
 /** 数值型配置项集合（读取时转 number） */

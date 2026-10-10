@@ -44,4 +44,22 @@ CREATE TABLE IF NOT EXISTS login_failures (
 
 CREATE INDEX IF NOT EXISTS idx_links_sha256 ON links(sha256);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires ON admin_sessions(expires_at);
+
+-- 下载请求日志：code 为 444 表示「直接断开连接、未返回状态码」
+CREATE TABLE IF NOT EXISTS access_logs (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  ip          TEXT NOT NULL,
+  method      TEXT NOT NULL,
+  path        TEXT NOT NULL,
+  code        INTEGER NOT NULL,
+  bytes_sent  INTEGER NOT NULL DEFAULT 0,
+  duration_ms INTEGER NOT NULL DEFAULT 0,
+  ua          TEXT NOT NULL DEFAULT '',
+  referer     TEXT NOT NULL DEFAULT '',
+  created_at  INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_access_logs_created ON access_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_access_logs_ip ON access_logs(ip);
+CREATE INDEX IF NOT EXISTS idx_access_logs_code ON access_logs(code);
 `;

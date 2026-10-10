@@ -8,7 +8,7 @@
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.5-339933.svg?logo=nodedotjs&logoColor=white)](https://nodejs.org)
-[![Tests](https://img.shields.io/badge/tests-44%20passing-brightgreen.svg)](#测试)
+[![Tests](https://img.shields.io/badge/tests-55%20passing-brightgreen.svg)](#测试)
 [![Dependencies](https://img.shields.io/badge/runtime%20deps-4-brightgreen.svg)](package.json)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
@@ -49,14 +49,14 @@
 - 入口与密码可在后台**改成固定值**（配置后即覆盖随机逻辑），密码要求大小写字母 + 数字 + 特殊符号，以 scrypt 加盐哈希存储
 - 文件登记：输入服务器绝对路径，流式计算 sha256；也可用内置**目录浏览器**逐层挑选（带路径输入与面包屑）
 - 一键复制下载链接（点击瞬间才向后端取最新链接，不做轮询）、重新生成链接、移除映射（不动磁盘文件）
-- IP 黑名单增删、限速与并发配置、系统监控（网卡上下行流量）
+- IP 黑名单增删、限速与并发配置、系统监控（网卡上下行流量）、下载请求日志（分页 / 搜索 / 筛选 / 导出 CSV）
 - 管理接口与页面统一挂在随机前缀下，与公开 `/api` 隔离；访问任何猜测路径一律断连
 
 **工程**
 
 - 运行时零编译依赖：数据库用 Node 内置 `node:sqlite`，密码哈希用内置 `crypto.scrypt`
 - 所有 SQL 走预编译参数绑定；前端不使用 `innerHTML`；`helmet` 统一安全响应头
-- 分层清晰（routes → services → repos），`node:test` 覆盖 44 个用例
+- 分层清晰（routes → services → repos），`node:test` 覆盖 55 个用例
 
 ## 界面预览
 
@@ -195,6 +195,18 @@ location ^~ / {
 - 用内置目录浏览器从 `/` 开始逐层进入，选中文件后自动回填路径
 
 目录浏览服务端有内存缓存：比对目录 `mtime` 判断是否变化，未变则命中缓存，另有 5 分钟 TTL 兜底，LRU 上限 200 条。每个目录旁可单独清除缓存。符号链接一律跳过不跟随。
+
+### 下载日志
+
+「下载日志」页记录每一次下载路径（`/d/*`）的请求，包含 IP、方法、路径、状态码、发送字节数、耗时、User-Agent 与 Referer。
+
+- 写入在响应结束后异步入队，**不阻塞下载响应**；队列每 1 秒或累积 200 条时批量落库
+- 状态码 `444` 表示该请求被直接断开连接（短码非法或不存在、文件在磁盘上已丢失）
+- 支持分页（10 / 20 / 50 / 100）、关键词搜索（路径 / IP / 方法）、时间范围（今天 / 本周 / 本月 / 本年 / 自定义）、状态码筛选、排序（时间 / 耗时 / 字节数）
+- 时间范围按**浏览器本地时区**换算后传给服务端，避免服务器时区造成的偏差
+- 统计卡片（请求数 / 累计流量 / 444 次数 / Top IP）跟随当前筛选条件变化
+- 「导出 CSV」按同一筛选条件导出全部匹配记录（上限 5 万行），带 UTF-8 BOM 可直接用 Excel 打开，并对 `=`、`+`、`-`、`@` 开头的值做公式注入防护
+- 日志默认保留 30 天，由 `log_retention_days` 配置控制，每小时清理一次
 
 ### 系统监控
 

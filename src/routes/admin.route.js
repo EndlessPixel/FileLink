@@ -5,6 +5,7 @@ import { SESSION_COOKIE } from '../config/constants.js';
 import * as configStore from '../config/store.js';
 import * as blacklistRepo from '../db/repos/blacklist.repo.js';
 import { requireAuth } from '../middleware/adminAuth.js';
+import * as accessLogService from '../services/accessLogService.js';
 import { attemptLogin, destroySession, issueCaptcha, readSession } from '../services/authService.js';
 import { invalidateCache, listDirectory } from '../services/directoryService.js';
 import { addFileByPath, removeFile } from '../services/fileService.js';
@@ -85,6 +86,21 @@ export function createAdminRouter() {
   // 系统监控：网卡上下行速率采样
   router.get('/api/monitor/network', (_req, res) => {
     res.json(networkMonitor.getNetworkSnapshot());
+  });
+
+  // 下载请求日志：分页 + 搜索 + 时间范围 + 状态码筛选 + 排序
+  router.get('/api/logs', (req, res) => {
+    res.json(accessLogService.queryAccessLogs(req.query));
+  });
+
+  router.get('/api/logs/export', (req, res) => {
+    const { csv, count } = accessLogService.exportAccessLogsCsv(req.query);
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    res
+      .type('text/csv; charset=utf-8')
+      .set('Content-Disposition', `attachment; filename="filelink-logs-${stamp}.csv"`)
+      .set('X-Exported-Rows', String(count))
+      .send(csv);
   });
 
   router.get('/api/files', (_req, res) => {
