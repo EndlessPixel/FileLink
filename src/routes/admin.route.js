@@ -11,6 +11,7 @@ import { invalidateCache, listDirectory } from '../services/directoryService.js'
 import { addFileByPath, removeFile } from '../services/fileService.js';
 import * as networkMonitor from '../services/networkMonitor.js';
 import * as securityService from '../services/securityService.js';
+import * as siteFilesService from '../services/siteFilesService.js';
 import { getStats, listFilesWithLinks, refreshLink } from '../services/linkService.js';
 import { isIpAddress, isSha256, normalizeSha256, toNonNegativeInt } from '../utils/validate.js';
 
@@ -86,6 +87,36 @@ export function createAdminRouter() {
   // 系统监控：网卡上下行速率采样
   router.get('/api/monitor/network', (_req, res) => {
     res.json(networkMonitor.getNetworkSnapshot());
+  });
+
+  // 站点声明文件：robots.txt 与 /.well-known/security.txt 的图形化配置
+  router.get('/api/site-files', (_req, res) => {
+    res.json({
+      robots: siteFilesService.getRobotsConfig(),
+      securityTxt: siteFilesService.getSecurityTxtConfig(),
+      previews: {
+        robots: siteFilesService.renderRobotsTxt(),
+        securityTxt: siteFilesService.renderSecurityTxt(),
+      },
+    });
+  });
+
+  router.put('/api/site-files/robots', (req, res) => {
+    const result = siteFilesService.setRobotsConfig(req.body ?? {});
+    if (result.error) {
+      res.status(400).json({ error: 'invalid_robots', message: result.error });
+      return;
+    }
+    res.json({ ok: true, config: result.config, preview: siteFilesService.renderRobotsTxt() });
+  });
+
+  router.put('/api/site-files/security-txt', (req, res) => {
+    const result = siteFilesService.setSecurityTxtConfig(req.body ?? {});
+    if (result.error) {
+      res.status(400).json({ error: 'invalid_security_txt', message: result.error });
+      return;
+    }
+    res.json({ ok: true, config: result.config, preview: siteFilesService.renderSecurityTxt() });
   });
 
   // 下载请求日志：分页 + 搜索 + 时间范围 + 状态码筛选 + 排序

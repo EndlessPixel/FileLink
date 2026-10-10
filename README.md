@@ -8,7 +8,7 @@
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.5-339933.svg?logo=nodedotjs&logoColor=white)](https://nodejs.org)
-[![Tests](https://img.shields.io/badge/tests-55%20passing-brightgreen.svg)](#测试)
+[![Tests](https://img.shields.io/badge/tests-64%20passing-brightgreen.svg)](#测试)
 [![Dependencies](https://img.shields.io/badge/runtime%20deps-4-brightgreen.svg)](package.json)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
@@ -49,14 +49,14 @@
 - 入口与密码可在后台**改成固定值**（配置后即覆盖随机逻辑），密码要求大小写字母 + 数字 + 特殊符号，以 scrypt 加盐哈希存储
 - 文件登记：输入服务器绝对路径，流式计算 sha256；也可用内置**目录浏览器**逐层挑选（带路径输入与面包屑）
 - 一键复制下载链接（点击瞬间才向后端取最新链接，不做轮询）、重新生成链接、移除映射（不动磁盘文件）
-- IP 黑名单增删、限速与并发配置、系统监控（网卡上下行流量）、下载请求日志（分页 / 搜索 / 筛选 / 导出 CSV）
+- IP 黑名单增删、限速与并发配置、系统监控（网卡上下行流量）、下载请求日志（分页 / 搜索 / 筛选 / 导出 CSV）、robots.txt 与 security.txt 图形化配置
 - 管理接口与页面统一挂在随机前缀下，与公开 `/api` 隔离；访问任何猜测路径一律断连
 
 **工程**
 
 - 运行时零编译依赖：数据库用 Node 内置 `node:sqlite`，密码哈希用内置 `crypto.scrypt`
 - 所有 SQL 走预编译参数绑定；前端不使用 `innerHTML`；`helmet` 统一安全响应头
-- 分层清晰（routes → services → repos），`node:test` 覆盖 55 个用例
+- 分层清晰（routes → services → repos），`node:test` 覆盖 64 个用例
 
 ## 界面预览
 
@@ -217,6 +217,23 @@ location ^~ / {
 - 速率由网卡累计计数器求差得出；计数器回绕时归零而不是出现负数
 - 仅支持 Linux，其他平台页面会显示为不支持；在容器中运行时统计的是容器网络命名空间的流量
 - 底部展示网卡自开机以来的累计收发量（含该网卡上其他进程的流量）
+
+### 站点声明文件
+
+在「安全设置」页可以图形化配置两个对外公开的声明文件，保存后立即生效：
+
+**robots.txt**（`/robots.txt`）—— 默认启用，策略为禁止全站抓取。提供四个预设：禁止全站 / 允许全站 / 仅禁止下载目录（`Disallow: /d/`）/ 自定义规则；表单内实时预览将要输出的内容。关闭后该路径不再提供文件（按未知路径处理，直接断开连接）。
+
+**security.txt**（`/.well-known/security.txt`）—— 默认关闭。字段遵循 RFC 9116：
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `Contact` | 启用时必填 | `mailto:邮箱` 或 `http(s)` 链接 |
+| `Expires` | 启用时必填 | ISO 8601 日期，默认给一年后 |
+| `Encryption` / `Policy` / `Canonical` / `Acknowledgments` | 可选 | 需为 `http(s)` 链接 |
+| `Preferred-Languages` | 可选 | 如 `zh-CN, en` |
+
+未填写的字段不会出现在输出文件中；校验不通过会返回明确的错误提示而不落盘。
 
 ### 安全入口与密码
 
