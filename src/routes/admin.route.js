@@ -8,6 +8,7 @@ import { requireAuth } from '../middleware/adminAuth.js';
 import { attemptLogin, destroySession, issueCaptcha, readSession } from '../services/authService.js';
 import { invalidateCache, listDirectory } from '../services/directoryService.js';
 import { addFileByPath, removeFile } from '../services/fileService.js';
+import * as networkMonitor from '../services/networkMonitor.js';
 import * as securityService from '../services/securityService.js';
 import { getStats, listFilesWithLinks, refreshLink } from '../services/linkService.js';
 import { isIpAddress, isSha256, normalizeSha256, toNonNegativeInt } from '../utils/validate.js';
@@ -79,6 +80,11 @@ export function createAdminRouter() {
 
   router.get('/api/stats', (_req, res) => {
     res.json(getStats());
+  });
+
+  // 系统监控：网卡上下行速率采样
+  router.get('/api/monitor/network', (_req, res) => {
+    res.json(networkMonitor.getNetworkSnapshot());
   });
 
   router.get('/api/files', (_req, res) => {

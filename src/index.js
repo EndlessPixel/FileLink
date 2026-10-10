@@ -8,6 +8,7 @@ import { sweepApiWindows } from './core/apiRateLimit.js';
 import { closeDb, initDb } from './db/index.js';
 import { deleteExpiredBans } from './db/repos/loginFailures.repo.js';
 import { deleteExpiredSessions } from './db/repos/sessions.repo.js';
+import { startNetworkMonitor, stopNetworkMonitor } from './services/networkMonitor.js';
 import {
   getAdminPath,
   hasCustomAdminPath,
@@ -99,6 +100,9 @@ function main() {
 
   runCleanup();
 
+  // 网卡流量采样（仅 Linux 可用，失败不影响主流程）
+  startNetworkMonitor().catch((err) => logger.warn(`network monitor unavailable: ${err.message}`));
+
   const app = createApp({ sessionSecret });
   const server = app.listen(port, host, () => {
     const listen = `${host}:${port}`;
@@ -128,6 +132,7 @@ function main() {
   const shutdown = (signal) => {
     logger.info(`received ${signal}, shutting down`);
     clearInterval(cleanupTimer);
+    stopNetworkMonitor();
     server.close(() => {
       closeDb();
       process.exit(0);
