@@ -49,6 +49,10 @@ export const api = {
   deleteFile: (sha256) => request(`files/${sha256}`, { method: 'DELETE' }),
   refreshLink: (sha256) => request(`files/${sha256}/refresh`, { method: 'POST' }),
 
+  directories: (path) => request(`directories?path=${encodeURIComponent(path)}`),
+  invalidateDirectoryCache: (path) =>
+    request(`directories/cache?path=${encodeURIComponent(path)}`, { method: 'DELETE' }),
+
   blacklist: () => request('blacklist'),
   addBlacklist: (ip, reason) => request('blacklist', { method: 'POST', body: { ip, reason } }),
   removeBlacklist: (ip) => request(`blacklist/${encodeURIComponent(ip)}`, { method: 'DELETE' }),

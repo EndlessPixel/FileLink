@@ -1,8 +1,9 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
-import { FolderOpen, Loader2, X } from 'lucide-vue-next';
+import { FolderOpen, FolderTree, Loader2, X } from 'lucide-vue-next';
 import api from '../api.js';
 import { toast } from '../toast.js';
+import FileTreePicker from './FileTreePicker.vue';
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -27,6 +28,11 @@ watch(
     if (open) filePath.value = '';
   }
 );
+
+/** 文件选择器选中后填入路径输入框 */
+function handlePickerSelect(path) {
+  filePath.value = path;
+}
 
 async function submit() {
   if (!canSubmit.value) return;
@@ -60,7 +66,10 @@ async function submit() {
       class="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/80 px-4 backdrop-blur-sm"
       @click.self="emit('close')"
     >
-      <form class="glass-card w-full max-w-[520px] p-6 animate-fade-up" @submit.prevent="submit">
+      <form
+        class="glass-card max-h-[86vh] w-full max-w-[560px] overflow-y-auto p-6 animate-fade-up"
+        @submit.prevent="submit"
+      >
         <div class="flex items-start justify-between gap-4">
           <div>
             <h3 class="text-[15px] font-semibold text-fg">添加文件</h3>
@@ -88,6 +97,14 @@ async function submit() {
           </div>
           <p v-if="pathError" class="mt-2 text-[12px] text-warn">{{ pathError }}</p>
           <p v-else class="mt-2 text-[12px] text-fg-dim">仅建立数据库映射，不会复制或修改磁盘上的原文件</p>
+        </div>
+
+        <div class="mt-4">
+          <p class="mb-2 flex items-center gap-1.5 text-[13px] font-medium text-fg-muted">
+            <FolderTree class="size-3.5 text-brand-400" />
+            从服务器浏览选择
+          </p>
+          <FileTreePicker @select="handlePickerSelect" />
         </div>
 
         <div class="mt-6 flex justify-end gap-2.5">
