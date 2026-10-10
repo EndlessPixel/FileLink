@@ -3,6 +3,8 @@ import { computed, onMounted, ref } from 'vue';
 import { Check, Eye, EyeOff, Info, KeyRound, Loader2, Route, Save, ShieldCheck, X } from 'lucide-vue-next';
 import api from '../api.js';
 import { toast } from '../toast.js';
+import RobotsForm from '../components/RobotsForm.vue';
+import SecurityTxtForm from '../components/SecurityTxtForm.vue';
 
 const loading = ref(true);
 const currentPath = ref('');
@@ -256,6 +258,9 @@ onMounted(load);
           </div>
         </div>
       </div>
+
+      <RobotsForm />
+      <SecurityTxtForm />
 
       <div class="flex items-start gap-2.5 px-1 text-[12px] text-fg-dim">
         <Info class="mt-0.5 size-3.5 shrink-0" />

@@ -63,6 +63,10 @@ export const api = {
 
   logs: (params) => request(`logs?${new URLSearchParams(params).toString()}`),
 
+  siteFiles: () => request('site-files'),
+  saveRobots: (payload) => request('site-files/robots', { method: 'PUT', body: payload }),
+  saveSecurityTxt: (payload) => request('site-files/security-txt', { method: 'PUT', body: payload }),
+
   security: () => request('security'),
   updateAdminPath: (path) => request('security/path', { method: 'PUT', body: { path } }),
   updatePassword: (payload) => request('security/password', { method: 'PUT', body: payload }),
