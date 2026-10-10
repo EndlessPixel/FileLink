@@ -8,7 +8,7 @@
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.5-339933.svg?logo=nodedotjs&logoColor=white)](https://nodejs.org)
-[![Tests](https://img.shields.io/badge/tests-39%20passing-brightgreen.svg)](#测试)
+[![Tests](https://img.shields.io/badge/tests-44%20passing-brightgreen.svg)](#测试)
 [![Dependencies](https://img.shields.io/badge/runtime%20deps-4-brightgreen.svg)](package.json)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
@@ -49,14 +49,14 @@
 - 入口与密码可在后台**改成固定值**（配置后即覆盖随机逻辑），密码要求大小写字母 + 数字 + 特殊符号，以 scrypt 加盐哈希存储
 - 文件登记：输入服务器绝对路径，流式计算 sha256；也可用内置**目录浏览器**逐层挑选（带路径输入与面包屑）
 - 一键复制下载链接（点击瞬间才向后端取最新链接，不做轮询）、重新生成链接、移除映射（不动磁盘文件）
-- IP 黑名单增删、限速与并发配置
+- IP 黑名单增删、限速与并发配置、系统监控（网卡上下行流量）
 - 管理接口与页面统一挂在随机前缀下，与公开 `/api` 隔离；访问任何猜测路径一律断连
 
 **工程**
 
 - 运行时零编译依赖：数据库用 Node 内置 `node:sqlite`，密码哈希用内置 `crypto.scrypt`
 - 所有 SQL 走预编译参数绑定；前端不使用 `innerHTML`；`helmet` 统一安全响应头
-- 分层清晰（routes → services → repos），`node:test` 覆盖 39 个用例
+- 分层清晰（routes → services → repos），`node:test` 覆盖 44 个用例
 
 ## 界面预览
 
@@ -195,6 +195,16 @@ location ^~ / {
 - 用内置目录浏览器从 `/` 开始逐层进入，选中文件后自动回填路径
 
 目录浏览服务端有内存缓存：比对目录 `mtime` 判断是否变化，未变则命中缓存，另有 5 分钟 TTL 兜底，LRU 上限 200 条。每个目录旁可单独清除缓存。符号链接一律跳过不跟随。
+
+### 系统监控
+
+「系统监控」页展示服务器网卡的上行（发送）与下行（接收）实时速率：一张双线面积图，外加当前速率与峰值。
+
+- 数据来源是 Linux 的 `/proc/net/dev`；统计接口由 `/proc/net/route` 的默认路由自动识别，也可用环境变量 `MONITOR_INTERFACE=eth0` 手动指定
+- 服务端每 5 秒采样一次，保留最近 30 分钟（最多 360 个点）于进程内存，页面每 5 秒拉取一次
+- 速率由网卡累计计数器求差得出；计数器回绕时归零而不是出现负数
+- 仅支持 Linux，其他平台页面会显示为不支持；在容器中运行时统计的是容器网络命名空间的流量
+- 底部展示网卡自开机以来的累计收发量（含该网卡上其他进程的流量）
 
 ### 安全入口与密码
 
