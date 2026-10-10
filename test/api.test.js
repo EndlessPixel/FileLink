@@ -8,9 +8,11 @@ import { resetApiWindows } from '../src/core/apiRateLimit.js';
 import { closeDb, initDb } from '../src/db/index.js';
 import * as filesRepo from '../src/db/repos/files.repo.js';
 import { createApp } from '../src/app.js';
+import { setRuntimeCredentials } from '../src/services/securityService.js';
 
 const SHA = 'a'.repeat(64);
 const UNKNOWN_SHA = 'b'.repeat(64);
+const ADMIN_PATH = '/test-admin-abc';
 
 let server;
 let baseUrl;
@@ -21,6 +23,7 @@ before(async () => {
   initDb(join(tempDir, 'test.db'));
   loadConfig();
   filesRepo.upsertFile({ sha256: SHA, filePath: '/tmp/whatever.bin', size: 1234, addedAt: Date.now() });
+  setRuntimeCredentials({ adminPath: ADMIN_PATH, password: 'RuntimePass1!' });
 
   const app = createApp({ sessionSecret: 'test-secret' });
   await new Promise((resolve) => {
@@ -93,6 +96,23 @@ test('GET /api/info 返回文件与链接状态', async () => {
   assert.equal(body.size, 1234);
   assert.equal(body.filePath, '/tmp/whatever.bin');
   assert.match(body.code, /^[0-9a-f]{16}$/);
+});
+
+test('管理路由挂在当前安全入口下：前缀被正确剥离', async () => {
+  const unauthorized = await fetch(`${baseUrl}${ADMIN_PATH}/api/security`);
+  assert.equal(unauthorized.status, 401);
+  assert.equal((await unauthorized.json()).error, 'unauthorized');
+
+  // 入口需要尾斜杠访问
+  const redirect = await fetch(`${baseUrl}${ADMIN_PATH}`, { redirect: 'manual' });
+  assert.equal(redirect.status, 308);
+  assert.equal(redirect.headers.get('location'), `${ADMIN_PATH}/`);
+
+  // 非该前缀一律断开连接
+  await assert.rejects(async () => {
+    const res = await fetch(`${baseUrl}/admin-guess/api/security`);
+    await res.text();
+  }, /fetch failed|ECONNRESET|other side closed/);
 });
 
 test('单 IP 每分钟超过 30 次返回 429', async () => {
