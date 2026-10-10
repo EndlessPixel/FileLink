@@ -129,6 +129,33 @@ sudo systemctl daemon-reload && sudo systemctl enable --now filelink
 journalctl -u filelink -n 40 --no-pager   # 查看入口与密码
 ```
 
+### Docker
+
+```bash
+docker build -t filelink .
+docker run -d --name filelink \
+  -p 127.0.0.1:3000:3000 \
+  -v filelink-data:/app/data \
+  filelink
+
+docker logs filelink        # 查看本次运行的管理入口与密码
+```
+
+镜像基于 `node:24-alpine`，多阶段构建：第一阶段构建管理控制台，第二阶段只安装生产依赖，并以非 root 的 `node` 用户运行。数据库文件位于 `/app/data`，请务必挂载卷以持久化。
+
+改用宿主目录挂载时，注意目录需对容器内的 uid 1000 可写：
+
+```bash
+mkdir -p ./data && sudo chown -R 1000:1000 ./data
+docker run -d --name filelink -p 127.0.0.1:3000:3000 -v "$PWD/data:/app/data" filelink
+```
+
+| 变量 | 容器内默认值 | 说明 |
+| --- | --- | --- |
+| `PORT` | `3000` | 监听端口 |
+| `HOST` | `0.0.0.0` | 容器内必须监听所有网卡，否则宿主机无法访问 |
+| `DB_PATH` | `/app/data/filelink.db` | 数据库位置，与挂载卷对应 |
+
 ### 反向代理
 
 建议 `HOST=127.0.0.1` 只监听本机，由 Nginx 对外服务：
