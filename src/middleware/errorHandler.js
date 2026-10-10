@@ -20,6 +20,11 @@ export function errorHandler(err, req, res, next) {
     res.status(400).json({ error: 'invalid_json' });
     return;
   }
+  // 业务层抛出的可预期错误（如 404 记录不存在）
+  if (Number.isInteger(err?.status) && err.status >= 400 && err.status < 500) {
+    res.status(err.status).json({ error: 'request_failed', message: err.message });
+    return;
+  }
   logger.error('unhandled error:', err);
   res.status(500).json({ error: 'internal_error' });
 }
