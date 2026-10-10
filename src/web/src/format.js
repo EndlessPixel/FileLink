@@ -22,6 +22,17 @@ export function formatTime(ms) {
   )}`;
 }
 
+/** 精确到秒的时间，用于日志等需要秒级精度的场景 */
+export function formatDateTime(ms) {
+  const value = Number(ms);
+  if (!Number.isFinite(value) || value <= 0) return '-';
+  const date = new Date(value);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(
+    date.getMinutes()
+  )}:${pad(date.getSeconds())}`;
+}
+
 export function shortHash(hash, length = 12) {
   if (typeof hash !== 'string' || hash.length === 0) return '-';
   return hash.length <= length ? hash : `${hash.slice(0, length)}…`;
