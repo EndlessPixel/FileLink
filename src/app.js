@@ -2,6 +2,7 @@ import cookieParser from 'cookie-parser';
 import express from 'express';
 import helmet from 'helmet';
 import { getClientIp } from './core/clientIp.js';
+import { createApiRouter } from './routes/api.route.js';
 import { createDownloadRouter } from './routes/download.route.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 
@@ -30,6 +31,8 @@ export function createApp({ sessionSecret }) {
   app.use(cookieParser(sessionSecret));
 
   app.use('/d', createDownloadRouter());
+
+  app.use('/api', express.json({ limit: '16kb' }), createApiRouter());
 
   app.use(notFoundHandler);
   app.use(errorHandler);
