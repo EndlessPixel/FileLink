@@ -5,6 +5,7 @@ import * as configStore from '../config/store.js';
 import * as blacklistRepo from '../db/repos/blacklist.repo.js';
 import { requireAuth } from '../middleware/adminAuth.js';
 import { attemptLogin, destroySession, issueCaptcha, readSession } from '../services/authService.js';
+import { invalidateCache, listDirectory } from '../services/directoryService.js';
 import { addFileByPath, removeFile } from '../services/fileService.js';
 import { getStats, listFilesWithLinks, refreshLink } from '../services/linkService.js';
 import { isIpAddress, isSha256, normalizeSha256, toNonNegativeInt } from '../utils/validate.js';
@@ -131,6 +132,17 @@ export function createAdminRouter({ adminPath, adminPassword }) {
     }
     blacklistRepo.removeFromBlacklist(ip);
     res.json({ ok: true });
+  });
+
+  // 目录浏览（文件选择器），带内存缓存
+  router.get('/api/directories', async (req, res) => {
+    const result = await listDirectory(req.query.path);
+    res.json(result);
+  });
+
+  router.delete('/api/directories/cache', (req, res) => {
+    const result = invalidateCache(req.query.path);
+    res.json({ ok: true, ...result });
   });
 
   router.get('/api/config', (_req, res) => {
