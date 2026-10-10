@@ -110,3 +110,13 @@ test/                 node:test 单元与集成测试
 ## 免责声明
 
 本服务为管理员主动登记的文件提供无鉴权直链，请仅在受信任的内网或自控服务器上部署，并注意磁盘文件的访问权限。
+
+## 文档
+
+- [SECURITY.md](./SECURITY.md) —— 安全模型、漏洞报告流程与**部署加固清单（务必阅读）**
+- [CONTRIBUTING.md](./CONTRIBUTING.md) —— 本地开发、代码规范与 Git 工作流
+- [LICENSE](./LICENSE) —— Apache License 2.0
+
+## 许可
+
+Copyright 2026 FileLink contributors，基于 [Apache License 2.0](./LICENSE) 发布。
