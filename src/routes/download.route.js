@@ -10,6 +10,7 @@ import { createThrottleStream } from '../core/throttle.js';
 import * as blacklistRepo from '../db/repos/blacklist.repo.js';
 import * as filesRepo from '../db/repos/files.repo.js';
 import * as linksRepo from '../db/repos/links.repo.js';
+import { recordAccess } from '../services/accessLogService.js';
 import { basename, contentDisposition, parseRange } from '../utils/http.js';
 import logger from '../utils/logger.js';
 
@@ -22,9 +23,29 @@ const IGNORABLE_STREAM_ERRORS = new Set([
 
 async function handleDownload(req, res) {
   const ip = req.clientIp;
+  const startedAt = Date.now();
+  const startBytes = req.socket?.bytesWritten ?? 0;
+  /** 写入日志的状态码；444 表示直接断开连接、未返回任何 HTTP 状态码 */
+  let logCode = 0;
+
+  // 响应结束（正常写完 / 客户端中断 / 服务端断开）后异步入队，不阻塞响应
+  res.on('close', () => {
+    recordAccess({
+      ip,
+      method: req.method,
+      path: (req.originalUrl || req.url || '').split('?')[0],
+      code: logCode || res.statusCode || 0,
+      bytesSent: Math.max((req.socket?.bytesWritten ?? 0) - startBytes, 0),
+      durationMs: Date.now() - startedAt,
+      ua: req.headers['user-agent'] ?? '',
+      referer: req.headers.referer ?? req.headers.referrer ?? '',
+      createdAt: startedAt,
+    });
+  });
 
   // 1.5 黑名单优先：不查短码直接 403
   if (blacklistRepo.isBlacklisted(ip)) {
+    logCode = 403;
     res.status(403).type('text/plain; charset=utf-8').send('Forbidden');
     return;
   }
@@ -32,12 +53,14 @@ async function handleDownload(req, res) {
   // 1.6 短码格式不匹配：直接断开连接，不返回任何 HTTP 状态码
   const { code } = req.params;
   if (!isValidCode(code)) {
+    logCode = 444;
     abortConnection(req, res);
     return;
   }
 
   // 4.1 单 IP 并发连接限制
   if (!acquireSlot(ip)) {
+    logCode = 503;
     res.status(503).set('Retry-After', '5').type('text/plain; charset=utf-8').send('Too Many Connections');
     return;
   }
@@ -52,12 +75,14 @@ async function handleDownload(req, res) {
   // 1.2 短码不存在：直接断开连接
   const link = linksRepo.getLinkByCode(code);
   if (!link) {
+    logCode = 444;
     abortConnection(req, res);
     return;
   }
 
   const file = filesRepo.getFile(link.sha256);
   if (!file) {
+    logCode = 444;
     abortConnection(req, res);
     return;
   }
@@ -67,10 +92,12 @@ async function handleDownload(req, res) {
     info = await stat(file.filePath);
   } catch {
     logger.warn(`download target missing on disk: ${file.filePath}`);
+    logCode = 444;
     abortConnection(req, res);
     return;
   }
   if (!info.isFile()) {
+    logCode = 444;
     abortConnection(req, res);
     return;
   }
@@ -78,6 +105,7 @@ async function handleDownload(req, res) {
   const size = info.size;
   const range = parseRange(req.headers.range, size);
   if (range && range.invalid) {
+    logCode = 416;
     res.status(416).set('Content-Range', `bytes */${size}`).end();
     return;
   }
@@ -86,6 +114,7 @@ async function handleDownload(req, res) {
   const end = range ? range.end : Math.max(size - 1, 0);
   const statusCode = range ? 206 : 200;
   const length = size === 0 ? 0 : end - start + 1;
+  logCode = statusCode;
 
   const headers = {
     'Content-Type': 'application/octet-stream',
