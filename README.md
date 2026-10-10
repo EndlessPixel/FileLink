@@ -300,7 +300,7 @@ curl "http://localhost:3000/api/info?sha256=<sha256>"
 
 分层约定为 `routes → services → db/repos`：路由层不写 SQL，仓储层不处理 HTTP 语义。数据库、配置与安全设置都经仓储层落到 SQLite；并发计数、令牌桶、限流窗口是进程内状态（因此当前实现面向单进程部署）。
 
-六个数据表：`files`、`links`、`ip_blacklist`、`admin_sessions`、`config`、`login_failures`。
+七个数据表：`files`、`links`、`ip_blacklist`、`admin_sessions`、`config`、`login_failures`、`access_logs`。
 
 ## 开发
 
