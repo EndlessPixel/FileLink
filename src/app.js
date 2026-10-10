@@ -7,6 +7,7 @@ import { createApiRouter } from './routes/api.route.js';
 import { createDownloadRouter } from './routes/download.route.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import * as securityService from './services/securityService.js';
+import * as siteFilesService from './services/siteFilesService.js';
 
 /**
  * 装配 Express 应用。中间件顺序至关重要：
@@ -50,6 +51,25 @@ export function createApp({ sessionSecret }) {
 
   app.use('/d', createDownloadRouter());
   app.use('/api', express.json({ limit: '16kb' }), createApiRouter());
+
+  // 公开的站点声明文件，仅在配置启用后提供，否则按未知路径处理（断连）
+  app.get('/robots.txt', (req, res) => {
+    const body = siteFilesService.renderRobotsTxt();
+    if (body === null) {
+      notFoundHandler(req, res);
+      return;
+    }
+    res.type('text/plain; charset=utf-8').set('Cache-Control', 'public, max-age=3600').send(body);
+  });
+
+  app.get('/.well-known/security.txt', (req, res) => {
+    const body = siteFilesService.renderSecurityTxt();
+    if (body === null) {
+      notFoundHandler(req, res);
+      return;
+    }
+    res.type('text/plain; charset=utf-8').set('Cache-Control', 'public, max-age=3600').send(body);
+  });
 
   // 管理后台：路径动态取自安全设置（自定义入口优先，否则为启动随机入口）
   const adminRouter = createAdminRouter();

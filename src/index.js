@@ -18,6 +18,7 @@ import {
   loadSecuritySettings,
   setRuntimeCredentials,
 } from './services/securityService.js';
+import { loadSiteFiles } from './services/siteFilesService.js';
 import logger from './utils/logger.js';
 
 /** 6.3 清理过期会话、已结束的封禁记录与超期访问日志 */
@@ -96,6 +97,7 @@ function main() {
   initDb(dbPath);
   loadConfig();
   loadSecuritySettings();
+  loadSiteFiles();
 
   // 先注入本次运行的随机凭据，再用它们作为「未自定义」时的兜底
   const generatedPath = `/${ADMIN_PATH_PREFIX}${generateAdminPathSuffix()}`;
