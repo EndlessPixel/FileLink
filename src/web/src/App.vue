@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { Activity, Clock, Files, Link2, LogOut, ShieldBan, Sliders } from 'lucide-vue-next';
+import { Activity, Clock, Files, Link2, LogOut, ShieldBan, ShieldCheck, Sliders } from 'lucide-vue-next';
 import api, { setUnauthorizedHandler } from './api.js';
 import { formatDuration } from './format.js';
 import { toast } from './toast.js';
@@ -9,11 +9,13 @@ import LoginView from './views/LoginView.vue';
 import FilesView from './views/FilesView.vue';
 import BlacklistView from './views/BlacklistView.vue';
 import SettingsView from './views/SettingsView.vue';
+import SecurityView from './views/SecurityView.vue';
 
 const tabs = [
   { id: 'files', label: '文件管理', hint: '登记与分发', icon: Files, view: FilesView },
   { id: 'blacklist', label: 'IP 黑名单', hint: '访问拦截', icon: ShieldBan, view: BlacklistView },
   { id: 'settings', label: '限速与设置', hint: '带宽控制', icon: Sliders, view: SettingsView },
+  { id: 'security', label: '安全设置', hint: '入口与密码', icon: ShieldCheck, view: SecurityView },
 ];
 
 const authenticated = ref(false);
