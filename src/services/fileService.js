@@ -1,3 +1,4 @@
+import { stat } from 'node:fs/promises';
 import { normalize } from 'node:path';
 import * as filesRepo from '../db/repos/files.repo.js';
 import { fileMeta, sha256File } from '../core/hash.js';
@@ -55,4 +56,66 @@ export function getFile(sha256) {
   const file = filesRepo.getFile(sha256);
   if (!file) throw new FileServiceError('文件记录不存在', 404);
   return file;
+}
+
+/** 磁盘存在性检测结果缓存时长：30 秒内重复调用不会重新扫盘 */
+const HEALTH_CACHE_MS = 30_000;
+/** 并发检测上限，避免文件很多时耗尽文件描述符 */
+const HEALTH_CONCURRENCY = 16;
+
+let healthCache = { at: 0, missing: new Set(), checked: 0 };
+
+/**
+ * 检测已登记文件在磁盘上是否仍存在。
+ * 结果带 30 秒缓存；force 为 true 时强制重新扫描。
+ */
+export async function checkFilesHealth({ force = false } = {}) {
+  const now = Date.now();
+  if (!force && now - healthCache.at < HEALTH_CACHE_MS) return healthCache;
+
+  const files = filesRepo.listFiles();
+  const missing = new Set();
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < files.length) {
+      const file = files[cursor];
+      cursor += 1;
+      try {
+        const info = await stat(file.filePath);
+        if (!info.isFile()) missing.add(file.sha256);
+      } catch {
+        // 文件被移走、改名或权限不足，一律视为失效
+        missing.add(file.sha256);
+      }
+    }
+  }
+
+  const workers = Math.min(HEALTH_CONCURRENCY, files.length);
+  await Promise.all(Array.from({ length: workers }, worker));
+
+  healthCache = { at: now, missing, checked: files.length };
+  return healthCache;
+}
+
+/** 批量移除磁盘上已不存在的映射（依然不触碰磁盘文件） */
+export async function cleanupMissingFiles() {
+  const { missing } = await checkFilesHealth({ force: true });
+
+  const removed = [];
+  for (const sha256 of missing) {
+    try {
+      if (filesRepo.deleteFile(sha256) > 0) removed.push(sha256);
+    } catch {
+      // 单条失败不影响其余清理
+    }
+  }
+
+  healthCache = { at: 0, missing: new Set(), checked: 0 };
+  return { removed: removed.length, sha256List: removed };
+}
+
+/** 测试辅助 */
+export function resetHealthCache() {
+  healthCache = { at: 0, missing: new Set(), checked: 0 };
 }
