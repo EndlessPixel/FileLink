@@ -7,8 +7,10 @@ import { generateAdminPassword, generateAdminPathSuffix, generateSecret } from '
 import { sweepApiWindows } from './core/apiRateLimit.js';
 import { closeDb, initDb } from './db/index.js';
 import { deleteLogsBefore } from './db/repos/accessLogs.repo.js';
+import { loadBlacklistCache } from './db/repos/blacklist.repo.js';
 import { deleteExpiredBans } from './db/repos/loginFailures.repo.js';
 import { deleteExpiredSessions } from './db/repos/sessions.repo.js';
+import { loadWhitelistCache } from './db/repos/whitelist.repo.js';
 import { startAccessLogWriter, stopAccessLogWriter } from './services/accessLogService.js';
 import { startNetworkMonitor, stopNetworkMonitor } from './services/networkMonitor.js';
 import { startSystemMonitor, stopSystemMonitor } from './services/systemMonitor.js';
@@ -99,6 +101,10 @@ function main() {
   loadConfig();
   loadSecuritySettings();
   loadSiteFiles();
+
+  // IP 规则索引：黑名单的 CIDR 段与整张白名单表都缓存在内存中
+  loadBlacklistCache();
+  loadWhitelistCache();
 
   // 先注入本次运行的随机凭据，再用它们作为「未自定义」时的兜底
   const generatedPath = `/${ADMIN_PATH_PREFIX}${generateAdminPathSuffix()}`;
