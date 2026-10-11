@@ -69,4 +69,17 @@ CREATE TABLE IF NOT EXISTS access_logs (
 CREATE INDEX IF NOT EXISTS idx_access_logs_created ON access_logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_access_logs_ip ON access_logs(ip);
 CREATE INDEX IF NOT EXISTS idx_access_logs_code ON access_logs(code);
+
+-- 管理操作审计：记录后台的每一次写操作（不含密码等敏感值）
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  ip         TEXT NOT NULL,
+  action     TEXT NOT NULL,
+  target     TEXT NOT NULL DEFAULT '',
+  detail     TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
 `;

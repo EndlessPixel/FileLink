@@ -5,6 +5,7 @@ import {
   Clock,
   FileClock,
   Files,
+  History,
   Link2,
   LogOut,
   ShieldBan,
@@ -24,6 +25,7 @@ import SettingsView from './views/SettingsView.vue';
 import SecurityView from './views/SecurityView.vue';
 import MonitorView from './views/MonitorView.vue';
 import LogsView from './views/LogsView.vue';
+import AuditView from './views/AuditView.vue';
 
 const tabs = [
   { id: 'files', label: '文件管理', hint: '登记与分发', icon: Files, view: FilesView },
@@ -33,6 +35,7 @@ const tabs = [
   { id: 'whitelist', label: 'IP 白名单', hint: '免限速豁免', icon: Zap, view: WhitelistView },
   { id: 'settings', label: '限速与设置', hint: '带宽控制', icon: Sliders, view: SettingsView },
   { id: 'security', label: '安全设置', hint: '入口与密码', icon: ShieldCheck, view: SecurityView },
+  { id: 'audit', label: '操作审计', hint: '后台变更记录', icon: History, view: AuditView },
 ];
 
 const authenticated = ref(false);

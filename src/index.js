@@ -7,11 +7,13 @@ import { generateAdminPassword, generateAdminPathSuffix, generateSecret } from '
 import { sweepApiWindows } from './core/apiRateLimit.js';
 import { closeDb, initDb } from './db/index.js';
 import { deleteLogsBefore } from './db/repos/accessLogs.repo.js';
+import { deleteAuditBefore } from './db/repos/auditLogs.repo.js';
 import { loadBlacklistCache } from './db/repos/blacklist.repo.js';
 import { deleteExpiredBans } from './db/repos/loginFailures.repo.js';
 import { deleteExpiredSessions } from './db/repos/sessions.repo.js';
 import { loadWhitelistCache } from './db/repos/whitelist.repo.js';
 import { startAccessLogWriter, stopAccessLogWriter } from './services/accessLogService.js';
+import { startAuditWriter, stopAuditWriter } from './services/auditService.js';
 import { startNetworkMonitor, stopNetworkMonitor } from './services/networkMonitor.js';
 import { startSystemMonitor, stopSystemMonitor } from './services/systemMonitor.js';
 import {
@@ -33,14 +35,13 @@ function runCleanup() {
     sweepApiWindows(now);
 
     const retentionDays = getNumber('log_retention_days');
-    const logs =
-      retentionDays > 0
-        ? deleteLogsBefore(now - retentionDays * 24 * 60 * 60 * 1000)
-        : 0;
+    const cutoff = retentionDays > 0 ? now - retentionDays * 24 * 60 * 60 * 1000 : 0;
+    const logs = retentionDays > 0 ? deleteLogsBefore(cutoff) : 0;
+    const audits = retentionDays > 0 ? deleteAuditBefore(cutoff) : 0;
 
-    if (sessions > 0 || bans > 0 || logs > 0) {
+    if (sessions > 0 || bans > 0 || logs > 0 || audits > 0) {
       logger.info(
-        `cleanup done: ${sessions} session(s), ${bans} ban record(s), ${logs} access log(s) removed`
+        `cleanup done: ${sessions} session(s), ${bans} ban record(s), ${logs} access log(s), ${audits} audit log(s) removed`
       );
     }
   } catch (err) {
@@ -126,8 +127,9 @@ function main() {
   // 磁盘容量与 IO、内存、CPU 负载采样
   startSystemMonitor().catch((err) => logger.warn(`system monitor unavailable: ${err.message}`));
 
-  // 访问日志批量写入器（内存队列 + 定时刷盘）
+  // 访问日志与审计日志的批量写入器（内存队列 + 定时刷盘）
   startAccessLogWriter();
+  startAuditWriter();
 
   const app = createApp({ sessionSecret });
   const server = app.listen(port, host, () => {
@@ -161,6 +163,7 @@ function main() {
     stopNetworkMonitor();
     stopSystemMonitor();
     stopAccessLogWriter();
+    stopAuditWriter();
     server.close(() => {
       closeDb();
       process.exit(0);

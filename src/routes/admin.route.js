@@ -7,14 +7,15 @@ import * as blacklistRepo from '../db/repos/blacklist.repo.js';
 import * as whitelistRepo from '../db/repos/whitelist.repo.js';
 import { requireAuth } from '../middleware/adminAuth.js';
 import * as accessLogService from '../services/accessLogService.js';
+import * as auditService from '../services/auditService.js';
 import { attemptLogin, destroySession, issueCaptcha, readSession } from '../services/authService.js';
 import { invalidateCache, listDirectory } from '../services/directoryService.js';
-import { addFileByPath, removeFile } from '../services/fileService.js';
+import { addFileByPath, cleanupMissingFiles, removeFile } from '../services/fileService.js';
 import * as networkMonitor from '../services/networkMonitor.js';
 import * as securityService from '../services/securityService.js';
 import * as siteFilesService from '../services/siteFilesService.js';
 import * as systemMonitor from '../services/systemMonitor.js';
-import { getStats, listFilesWithLinks, refreshLink } from '../services/linkService.js';
+import { getStats, queryFilesWithLinks, refreshLink } from '../services/linkService.js';
 import { isIpRule, isSha256, normalizeSha256, toNonNegativeInt } from '../utils/validate.js';
 
 const SPEED_MAX_BPS = 10_000_000_000;
@@ -53,6 +54,11 @@ function updateLimits(body) {
   return { updated: Object.keys(updates) };
 }
 
+/** 记录一条管理操作审计（IP 取自真实客户端识别结果） */
+function audit(req, action, target = '', detail = '') {
+  auditService.recordAudit({ ip: req.clientIp, action, target, detail });
+}
+
 export function createAdminRouter() {
   const router = Router();
   const webDist = resolve(process.cwd(), 'dist', 'admin');
@@ -69,6 +75,12 @@ export function createAdminRouter() {
       password: req.body?.password,
       captchaText: req.body?.captcha,
     });
+    audit(
+      req,
+      result.status === 200 ? 'auth.login' : 'auth.login_failed',
+      '',
+      result.status === 200 ? '登录成功' : `登录未通过（HTTP ${result.status}）`
+    );
     res.status(result.status).json(result.body);
   });
 
@@ -79,6 +91,7 @@ export function createAdminRouter() {
 
   router.post('/api/logout', (req, res) => {
     destroySession(req, res, req.adminBasePath);
+    audit(req, 'auth.logout', '', '管理员退出登录');
     res.json({ ok: true });
   });
 
@@ -122,6 +135,7 @@ export function createAdminRouter() {
       res.status(400).json({ error: 'invalid_robots', message: result.error });
       return;
     }
+    audit(req, 'sitefiles.robots', '', `robots.txt 配置更新（mode=${result.config?.mode ?? '-'}）`);
     res.json({ ok: true, config: result.config, preview: siteFilesService.renderRobotsTxt() });
   });
 
@@ -131,6 +145,7 @@ export function createAdminRouter() {
       res.status(400).json({ error: 'invalid_security_txt', message: result.error });
       return;
     }
+    audit(req, 'sitefiles.security_txt', '', 'security.txt 配置更新');
     res.json({ ok: true, config: result.config, preview: siteFilesService.renderSecurityTxt() });
   });
 
@@ -153,12 +168,31 @@ export function createAdminRouter() {
     res.json(accessLogService.queryTrend(req.query));
   });
 
-  router.get('/api/files', (_req, res) => {
-    res.json({ files: listFilesWithLinks() });
+  // 管理操作审计：分页 + 关键词 + 操作类型筛选
+  router.get('/api/audit', (req, res) => {
+    res.json(auditService.queryAudit(req.query));
+  });
+
+  // 文件列表：分页 + 搜索 + 排序，并附带磁盘存在性标记
+  router.get('/api/files', async (req, res) => {
+    res.json(await queryFilesWithLinks(req.query));
   });
 
   router.post('/api/files', async (req, res) => {
     const result = await addFileByPath(req.body?.path);
+    audit(
+      req,
+      'file.add',
+      result.sha256,
+      `${result.isNew ? '登记' : '刷新'} ${result.filePath}（${result.size} 字节）`
+    );
+    res.json(result);
+  });
+
+  // 批量清理磁盘上已不存在的映射
+  router.post('/api/files/cleanup-missing', async (req, res) => {
+    const result = await cleanupMissingFiles();
+    audit(req, 'file.cleanup_missing', '', `清理失效映射 ${result.removed} 条`);
     res.json(result);
   });
 
@@ -169,6 +203,7 @@ export function createAdminRouter() {
       return;
     }
     removeFile(sha256);
+    audit(req, 'file.remove', sha256, '移除文件映射（未删除磁盘文件）');
     res.json({ ok: true });
   });
 
@@ -180,6 +215,7 @@ export function createAdminRouter() {
       return;
     }
     const link = refreshLink(sha256);
+    audit(req, 'file.refresh_link', sha256, `重新生成短码 ${link.code}`);
     res.json({ sha256, code: link.code, downloadCount: link.downloadCount });
   });
 
@@ -194,6 +230,7 @@ export function createAdminRouter() {
       return;
     }
     blacklistRepo.addToBlacklist(ip, String(req.body?.reason ?? '').slice(0, 200), Date.now());
+    audit(req, 'blacklist.add', ip, String(req.body?.reason ?? '').slice(0, 200) || '加入黑名单');
     res.json({ ok: true, ip });
   });
 
@@ -204,6 +241,7 @@ export function createAdminRouter() {
       return;
     }
     blacklistRepo.removeFromBlacklist(ip);
+    audit(req, 'blacklist.remove', ip, '移出黑名单');
     res.json({ ok: true });
   });
 
@@ -219,6 +257,7 @@ export function createAdminRouter() {
       return;
     }
     whitelistRepo.addToWhitelist(ip, String(req.body?.reason ?? '').slice(0, 200), Date.now());
+    audit(req, 'whitelist.add', ip, String(req.body?.reason ?? '').slice(0, 200) || '加入白名单');
     res.json({ ok: true, ip });
   });
 
@@ -229,6 +268,7 @@ export function createAdminRouter() {
       return;
     }
     whitelistRepo.removeFromWhitelist(ip);
+    audit(req, 'whitelist.remove', ip, '移出白名单');
     res.json({ ok: true });
   });
 
@@ -253,6 +293,7 @@ export function createAdminRouter() {
       res.status(400).json({ error: 'invalid_config', message: result.error });
       return;
     }
+    audit(req, 'config.update', '', `更新配置项：${result.updated.join(', ')}`);
     res.json({ ok: true, config: configStore.snapshot() });
   });
 
@@ -287,6 +328,7 @@ export function createAdminRouter() {
         maxAge: Math.max(expiresAt - Date.now(), 1000),
       });
     }
+    audit(req, 'security.path', result.path, `安全入口由 ${previousPath || '(未设置)'} 改为 ${result.path}`);
     res.json({ ok: true, adminPath: result.path });
   });
 
@@ -305,6 +347,8 @@ export function createAdminRouter() {
       res.status(400).json({ error: 'weak_password', message: result.error });
       return;
     }
+    // 仅记录「已修改」，绝不写入任何密码内容
+    audit(req, 'security.password', '', '管理员密码已更新');
     res.json({ ok: true });
   });
 
