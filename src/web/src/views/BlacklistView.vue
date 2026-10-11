@@ -14,12 +14,24 @@ const reason = ref('');
 const confirming = ref(null);
 const confirmLoading = ref(false);
 
+/** 支持单个地址或 CIDR 网段，与后端 isIpRule 保持一致 */
 const ipError = computed(() => {
   const value = ip.value.trim();
   if (value === '') return '';
+
+  if (value.includes('/')) {
+    const [address, prefix] = value.split('/');
+    const maxBits = address.includes(':') ? 128 : 32;
+    const isAddress = /^(\d{1,3}\.){3}\d{1,3}$/.test(address) || address.includes(':');
+    if (!isAddress) return 'CIDR 网段格式不正确，例如 198.51.100.0/24';
+    if (!/^\d{1,3}$/.test(prefix) || Number(prefix) > maxBits) {
+      return `前缀长度需在 0 到 ${maxBits} 之间`;
+    }
+    return '';
+  }
+
   const isV4 = /^(\d{1,3}\.){3}\d{1,3}$/.test(value);
-  const isV6 = value.includes(':');
-  return isV4 || isV6 ? '' : '请输入合法的 IPv4 或 IPv6 地址';
+  return isV4 || value.includes(':') ? '' : '请输入合法的 IP 或 CIDR 网段';
 });
 
 const canSubmit = computed(() => ip.value.trim() !== '' && !ipError.value && !submitting.value);
@@ -102,11 +114,13 @@ onMounted(load);
 
     <form class="glass-card p-5" @submit.prevent="submit">
       <h3 class="text-sm font-semibold text-fg">添加黑名单</h3>
-      <p class="mt-1 text-[12px] text-fg-dim">命中黑名单的 IP 访问下载路径时直接返回 403，不再校验短码</p>
+      <p class="mt-1 text-[12px] text-fg-dim">
+        命中黑名单的 IP 访问下载路径时直接返回 403，不再校验短码；支持单个地址或 CIDR 网段
+      </p>
 
       <div class="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] sm:items-start">
         <div>
-          <label class="mb-2 block text-[13px] font-medium text-fg-muted" for="blacklist-ip">IP 地址</label>
+          <label class="mb-2 block text-[13px] font-medium text-fg-muted" for="blacklist-ip">IP 或网段</label>
           <input
             id="blacklist-ip"
             v-model="ip"
@@ -114,7 +128,7 @@ onMounted(load);
             type="text"
             autocomplete="off"
             spellcheck="false"
-            placeholder="203.0.113.45"
+            placeholder="203.0.113.45 或 198.51.100.0/24"
             :disabled="submitting"
           />
           <p v-if="ipError" class="mt-2 text-[12px] text-warn">{{ ipError }}</p>

@@ -59,6 +59,10 @@ export const api = {
   addBlacklist: (ip, reason) => request('blacklist', { method: 'POST', body: { ip, reason } }),
   removeBlacklist: (ip) => request(`blacklist/${encodeURIComponent(ip)}`, { method: 'DELETE' }),
 
+  whitelist: () => request('whitelist'),
+  addWhitelist: (ip, reason) => request('whitelist', { method: 'POST', body: { ip, reason } }),
+  removeWhitelist: (ip) => request(`whitelist/${encodeURIComponent(ip)}`, { method: 'DELETE' }),
+
   config: () => request('config'),
   saveConfig: (payload) => request('config', { method: 'PUT', body: payload }),
 

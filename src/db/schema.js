@@ -24,6 +24,13 @@ CREATE TABLE IF NOT EXISTS ip_blacklist (
   added_at INTEGER NOT NULL
 );
 
+-- 白名单 IP 不受并发连接上限与带宽限速约束（ip 列同样可存 CIDR 段）
+CREATE TABLE IF NOT EXISTS ip_whitelist (
+  ip       TEXT PRIMARY KEY,
+  reason   TEXT,
+  added_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS admin_sessions (
   session_id TEXT PRIMARY KEY,
   created_at INTEGER NOT NULL,
