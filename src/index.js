@@ -11,6 +11,7 @@ import { deleteExpiredBans } from './db/repos/loginFailures.repo.js';
 import { deleteExpiredSessions } from './db/repos/sessions.repo.js';
 import { startAccessLogWriter, stopAccessLogWriter } from './services/accessLogService.js';
 import { startNetworkMonitor, stopNetworkMonitor } from './services/networkMonitor.js';
+import { startSystemMonitor, stopSystemMonitor } from './services/systemMonitor.js';
 import {
   getAdminPath,
   hasCustomAdminPath,
@@ -116,6 +117,9 @@ function main() {
   // 网卡流量采样（仅 Linux 可用，失败不影响主流程）
   startNetworkMonitor().catch((err) => logger.warn(`network monitor unavailable: ${err.message}`));
 
+  // 磁盘容量与 IO、内存、CPU 负载采样
+  startSystemMonitor().catch((err) => logger.warn(`system monitor unavailable: ${err.message}`));
+
   // 访问日志批量写入器（内存队列 + 定时刷盘）
   startAccessLogWriter();
 
@@ -149,6 +153,7 @@ function main() {
     logger.info(`received ${signal}, shutting down`);
     clearInterval(cleanupTimer);
     stopNetworkMonitor();
+    stopSystemMonitor();
     stopAccessLogWriter();
     server.close(() => {
       closeDb();

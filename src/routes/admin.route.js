@@ -12,6 +12,7 @@ import { addFileByPath, removeFile } from '../services/fileService.js';
 import * as networkMonitor from '../services/networkMonitor.js';
 import * as securityService from '../services/securityService.js';
 import * as siteFilesService from '../services/siteFilesService.js';
+import * as systemMonitor from '../services/systemMonitor.js';
 import { getStats, listFilesWithLinks, refreshLink } from '../services/linkService.js';
 import { isIpAddress, isSha256, normalizeSha256, toNonNegativeInt } from '../utils/validate.js';
 
@@ -35,6 +36,14 @@ function updateLimits(body) {
       return { error: `单 IP 并发上限必须是 1 到 ${CONCURRENCY_MAX} 之间的整数` };
     }
     updates.max_concurrent_downloads = String(conns);
+  }
+
+  if (body.disk_alert_percent !== undefined) {
+    const percent = toNonNegativeInt(body.disk_alert_percent, -1);
+    if (percent < 50 || percent > 100) {
+      return { error: '磁盘告警阈值必须是 50 到 100 之间的整数' };
+    }
+    updates.disk_alert_percent = String(percent);
   }
 
   if (Object.keys(updates).length === 0) return { error: '没有需要更新的配置项' };
@@ -89,6 +98,11 @@ export function createAdminRouter() {
     res.json(networkMonitor.getNetworkSnapshot());
   });
 
+  // 系统监控：磁盘容量与 IO、内存占用、CPU 负载
+  router.get('/api/monitor/system', (_req, res) => {
+    res.json(systemMonitor.getSystemSnapshot());
+  });
+
   // 站点声明文件：robots.txt 与 /.well-known/security.txt 的图形化配置
   router.get('/api/site-files', (_req, res) => {
     res.json({
@@ -132,6 +146,10 @@ export function createAdminRouter() {
       .set('Content-Disposition', `attachment; filename="filelink-logs-${stamp}.csv"`)
       .set('X-Exported-Rows', String(count))
       .send(csv);
+  });
+
+  router.get('/api/logs/trend', (req, res) => {
+    res.json(accessLogService.queryTrend(req.query));
   });
 
   router.get('/api/files', (_req, res) => {
