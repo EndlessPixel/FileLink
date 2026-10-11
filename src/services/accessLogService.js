@@ -110,6 +110,44 @@ export function queryAccessLogs(rawQuery) {
   };
 }
 
+/** 趋势图数据：按天聚合，缺失日期补零以保证折线连续 */
+export function queryTrend(rawQuery = {}) {
+  const parsed = Math.trunc(Number(rawQuery.days));
+  const days = Number.isFinite(parsed) ? Math.min(Math.max(parsed, 1), 90) : 14;
+  const rows = logRepo.dailyTrend(days);
+  const byDay = new Map(rows.map((row) => [row.day, row]));
+
+  const today = new Date();
+  const points = [];
+  for (let i = days - 1; i >= 0; i -= 1) {
+    const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+    const key = formatDayKey(date);
+    const row = byDay.get(key);
+    points.push({
+      day: key,
+      requests: row?.requests ?? 0,
+      downloads: row?.downloads ?? 0,
+      bytes: row?.bytes ?? 0,
+    });
+  }
+
+  const totals = points.reduce(
+    (acc, item) => ({
+      requests: acc.requests + item.requests,
+      downloads: acc.downloads + item.downloads,
+      bytes: acc.bytes + item.bytes,
+    }),
+    { requests: 0, downloads: 0, bytes: 0 }
+  );
+
+  return { days, points, totals };
+}
+
+function formatDayKey(date) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 /** 按同一筛选条件导出 CSV（带 BOM，Excel 可直接打开） */
 export function exportAccessLogsCsv(rawQuery) {
   const params = parseLogQuery(rawQuery);
