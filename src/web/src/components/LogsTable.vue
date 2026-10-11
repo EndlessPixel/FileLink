@@ -72,7 +72,10 @@ function uaLabel(ua) {
           <td class="px-5 py-3 font-mono text-[12px] whitespace-nowrap text-fg-muted">
             {{ formatDateTime(log.createdAt) }}
           </td>
-          <td class="px-4 py-3 font-mono text-[12px] whitespace-nowrap text-fg">{{ log.ip }}</td>
+          <td class="max-w-[200px] px-4 py-3">
+            <!-- IPv6 完整写法很长，限宽截断并保留 title，避免整表被撑宽 -->
+            <span class="block truncate font-mono text-[12px] text-fg" :title="log.ip">{{ log.ip }}</span>
+          </td>
           <td class="px-4 py-3">
             <span class="badge border border-line bg-white/3 font-mono text-fg-muted">{{ log.method }}</span>
           </td>

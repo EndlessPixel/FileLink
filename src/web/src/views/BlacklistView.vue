@@ -192,8 +192,10 @@ onMounted(load);
               :key="entry.ip"
               class="border-b border-white/4 transition hover:bg-white/3 last:border-0"
             >
-              <td class="px-5 py-3.5">
-                <span class="badge border border-danger/25 bg-danger/10 font-mono text-danger">{{ entry.ip }}</span>
+              <td class="max-w-[240px] px-5 py-3.5">
+                <span class="badge max-w-full border border-danger/25 bg-danger/10 font-mono text-danger">
+                  <span class="min-w-0 truncate" :title="entry.ip">{{ entry.ip }}</span>
+                </span>
               </td>
               <td class="px-4 py-3.5 text-fg-muted">{{ entry.reason || '—' }}</td>
               <td class="px-4 py-3.5 text-fg-muted">{{ formatTime(entry.addedAt) }}</td>

@@ -33,6 +33,22 @@ export function formatDateTime(ms) {
   )}:${pad(date.getSeconds())}`;
 }
 
+/**
+ * 长地址摘要：IPv6 完整写法有 39 个字符，放进卡片会撑破布局。
+ * 这里保留首两组与最后一组，中间省略；IPv4 等短地址原样返回。
+ */
+export function shortIp(ip) {
+  const value = String(ip ?? '');
+  if (value === '') return '-';
+  if (value.length <= 20) return value;
+
+  if (value.includes(':')) {
+    const parts = value.split(':');
+    if (parts.length >= 3) return `${parts[0]}:${parts[1]}:…:${parts[parts.length - 1]}`;
+  }
+  return `${value.slice(0, 12)}…${value.slice(-8)}`;
+}
+
 export function shortHash(hash, length = 12) {
   if (typeof hash !== 'string' || hash.length === 0) return '-';
   return hash.length <= length ? hash : `${hash.slice(0, length)}…`;
