@@ -46,10 +46,14 @@ export const api = {
   stats: () => request('stats'),
   networkMonitor: () => request('monitor/network'),
   systemMonitor: () => request('monitor/system'),
-  files: () => request('files'),
+  files: (params) => {
+    const query = params ? new URLSearchParams(params).toString() : '';
+    return request(query ? `files?${query}` : 'files');
+  },
   addFile: (path) => request('files', { method: 'POST', body: { path } }),
   deleteFile: (sha256) => request(`files/${sha256}`, { method: 'DELETE' }),
   refreshLink: (sha256) => request(`files/${sha256}/refresh`, { method: 'POST' }),
+  cleanupMissingFiles: () => request('files/cleanup-missing', { method: 'POST' }),
 
   directories: (path) => request(`directories?path=${encodeURIComponent(path)}`),
   invalidateDirectoryCache: (path) =>
@@ -68,6 +72,8 @@ export const api = {
 
   logs: (params) => request(`logs?${new URLSearchParams(params).toString()}`),
   logsTrend: (days) => request(`logs/trend?days=${encodeURIComponent(days)}`),
+
+  audit: (params) => request(`audit?${new URLSearchParams(params).toString()}`),
 
   siteFiles: () => request('site-files'),
   saveRobots: (payload) => request('site-files/robots', { method: 'PUT', body: payload }),
