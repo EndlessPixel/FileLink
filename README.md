@@ -8,7 +8,7 @@
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.5-339933.svg?logo=nodedotjs&logoColor=white)](https://nodejs.org)
-[![Tests](https://img.shields.io/badge/tests-64%20passing-brightgreen.svg)](#测试)
+[![Tests](https://img.shields.io/badge/tests-99%20passing-brightgreen.svg)](#测试)
 [![Dependencies](https://img.shields.io/badge/runtime%20deps-4-brightgreen.svg)](package.json)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
@@ -30,7 +30,7 @@
 
 - 路径为 `/d/{16 位十六进制短码}`，短码由 CSPRNG 生成，与文件 sha256 一对一
 - 短码非法或不存在时**直接销毁 TCP 连接**，不返回任何状态码 —— 外部无法区分「格式错误」「不存在」「文件已丢失」
-- 命中 IP 黑名单直接 `403`，不查询短码
+- 命中 IP 黑名单直接 `403`，不查询短码；黑名单与白名单均支持 IPv4/IPv6 的单地址与 CIDR 网段
 - 完整支持 HTTP `Range`（含后缀区间）与 `HEAD`，下载器可断点续传；非法区间 `416`
 - 非 ASCII 文件名使用 `filename*=UTF-8''` 编码，中文名不乱码
 - 响应完整写出后累加下载次数
@@ -41,6 +41,7 @@
 - 单 IP **聚合**带宽上限（默认 1 Mbps）：同一 IP 的所有连接共享一个令牌桶，而不是每条连接各分一份
 - 运行时可调，改完立即生效，正在进行的下载下一块数据即套用新速率
 - 公开 API 单 IP 每分钟请求上限（默认 30，超出 `429` 带 `Retry-After`）
+- IP 白名单：名单内的 IP 不受并发上限与带宽限速约束（内网镜像站、自有服务器常用）
 
 **管理控制台**
 
@@ -48,15 +49,21 @@
 - 密码第一次出错后强制图形验证码；连续 3 次失败封禁该 IP 5 分钟
 - 入口与密码可在后台**改成固定值**（配置后即覆盖随机逻辑），密码要求大小写字母 + 数字 + 特殊符号，以 scrypt 加盐哈希存储
 - 文件登记：输入服务器绝对路径，流式计算 sha256；也可用内置**目录浏览器**逐层挑选（带路径输入与面包屑）
+- 文件列表支持搜索、排序与分页，并自动标记**磁盘上已不存在的失效映射**，可一键清理
 - 一键复制下载链接（点击瞬间才向后端取最新链接，不做轮询）、重新生成链接、移除映射（不动磁盘文件）
-- IP 黑名单增删、限速与并发配置、系统监控（网卡上下行流量）、下载请求日志（分页 / 搜索 / 筛选 / 导出 CSV）、robots.txt 与 security.txt 图形化配置
+- IP 黑名单与白名单管理（均支持 CIDR 网段）、限速与并发配置（含磁盘告警阈值）
+- 系统监控：网卡上下行流量 + 磁盘容量与 IO + 内存 + CPU 负载
+- 下载日志：分页 / 搜索 / 筛选 / 导出 CSV，并带按天聚合的下载趋势图
+- 操作审计：登录、文件、IP 规则、配置与安全设置的每一次变更都有记录可查
+- robots.txt 与 security.txt 图形化配置
 - 管理接口与页面统一挂在随机前缀下，与公开 `/api` 隔离；访问任何猜测路径一律断连
 
 **工程**
 
 - 运行时零编译依赖：数据库用 Node 内置 `node:sqlite`，密码哈希用内置 `crypto.scrypt`
 - 所有 SQL 走预编译参数绑定；前端不使用 `innerHTML`；`helmet` 统一安全响应头
-- 分层清晰（routes → services → repos），`node:test` 覆盖 64 个用例
+- 管理界面静态资源按内容哈希长缓存（`immutable`），入口 `index.html` 不缓存
+- 分层清晰（routes → services → repos），`node:test` 覆盖 99 个用例
 
 ## 界面预览
 
@@ -75,7 +82,7 @@
 ──────────────────────────────────────────────────────────
 ```
 
-管理控制台为深色控制台风：文件管理、IP 黑名单、限速与设置、安全设置四个页面。
+管理控制台为深色控制台风，共八个页面：文件管理、下载日志、系统监控、IP 黑名单、IP 白名单、限速与设置、安全设置、操作审计。
 
 ## 快速开始
 
@@ -205,12 +212,23 @@ location ^~ / {
 - 支持分页（10 / 20 / 50 / 100）、关键词搜索（路径 / IP / 方法）、时间范围（今天 / 本周 / 本月 / 本年 / 自定义）、状态码筛选、排序（时间 / 耗时 / 字节数）
 - 时间范围按**浏览器本地时区**换算后传给服务端，避免服务器时区造成的偏差
 - 统计卡片（请求数 / 累计流量 / 444 次数 / Top IP）跟随当前筛选条件变化
+- 顶部「下载趋势」图按天聚合请求数与完成下载次数，可切换最近 7 / 14 / 30 天
 - 「导出 CSV」按同一筛选条件导出全部匹配记录（上限 5 万行），带 UTF-8 BOM 可直接用 Excel 打开，并对 `=`、`+`、`-`、`@` 开头的值做公式注入防护
 - 日志默认保留 30 天，由 `log_retention_days` 配置控制，每小时清理一次
 
 ### 系统监控
 
-「系统监控」页展示服务器网卡的上行（发送）与下行（接收）实时速率：一张双线面积图，外加当前速率与峰值。
+「系统监控」页分四块：磁盘容量、磁盘 IO、内存与 CPU 负载、网卡流量。
+
+**磁盘容量** —— 展示数据库所在目录与根分区（同一文件系统只保留一条）的总量、已用与剩余，使用率超过「磁盘告警阈值」（默认 90%，可在后台修改）时标红。这是文件分发服务最需要盯的指标：磁盘写满会直接让服务不可用。
+
+**磁盘 IO** —— 解析 `/proc/diskstats` 得到整块设备的读写速率（分区不重复计数），双线面积图，每 5 秒采样、保留最近 30 分钟。可用 `MONITOR_DISK=vda` 指定设备，`MONITOR_DISK_MOUNTS=/data,/` 指定要监控的挂载点。
+
+**内存与负载** —— 内存占用率与峰值、CPU 占用率、1/5/15 分钟平均负载与核心数。
+
+> 容器环境中 `statfs` 读到的是容器的文件系统，容量可能不等于宿主机真实值。
+
+**网卡流量** —— 上行（发送）与下行（接收）实时速率。
 
 - 数据来源是 Linux 的 `/proc/net/dev`；统计接口由 `/proc/net/route` 的默认路由自动识别，也可用环境变量 `MONITOR_INTERFACE=eth0` 手动指定
 - 服务端每 5 秒采样一次，保留最近 30 分钟（最多 360 个点）于进程内存，页面每 5 秒拉取一次
@@ -250,6 +268,23 @@ sqlite3 data/filelink.db "DELETE FROM config WHERE key IN ('admin_path','admin_p
 
 修改入口后，当前会话 cookie 会自动迁移到新路径，不会把你踢下线。
 
+### IP 白名单
+
+「IP 白名单」页添加的 IP **不受单 IP 并发上限与带宽限速约束**，适合内网镜像站、自有服务器这类需要全速拉取的场景。
+
+- 与黑名单一样支持单个地址或 CIDR 网段（`10.0.0.0/8`、`2001:db8::/32`）
+- 判定顺序：先查黑名单（命中直接 `403`），再查白名单（命中则跳过并发计数与令牌桶）
+- 规则缓存在进程内存，下载热路径只读内存，不额外查库；增删即时生效
+
+### 操作审计
+
+「操作审计」页记录管理后台的每一次写操作：登录成功/失败、文件增删、重新生成链接、清理失效映射、黑名单与白名单增删、限速配置修改、安全入口与密码修改、robots.txt 与 security.txt 配置，包含时间、操作类型、对象、说明与来源 IP。
+
+- 支持按关键词与操作类型筛选、分页浏览
+- 记录异步入队、批量落库，不给管理请求增加 IO 延迟
+- **密码类操作只记录「已修改」，不写入任何密码内容**
+- 保留期与下载日志共用 `log_retention_days`（默认 30 天）
+
 ## 配置
 
 ### 环境变量 / 命令行
@@ -275,6 +310,8 @@ sqlite3 data/filelink.db "DELETE FROM config WHERE key IN ('admin_path','admin_p
 | `session_ttl_seconds` | `43200` | 管理会话有效期 |
 | `login_max_failures` | `3` | 触发封禁的连续登录失败次数 |
 | `login_ban_seconds` | `300` | 登录失败封禁时长 |
+| `log_retention_days` | `30` | 下载日志与审计记录的保留天数，`0` 表示永久保留 |
+| `disk_alert_percent` | `90` | 磁盘使用率告警阈值（50–100），超过时监控页标红 |
 
 ## 公开 API
 
@@ -299,8 +336,18 @@ curl "http://localhost:3000/api/info?sha256=<sha256>"
 | `GET` | `/api/filelink?sha256=` | 获取（必要时创建）下载链接 |
 | `POST` | `/api/refresh` | 重新生成短码，旧链接立即失效 |
 | `GET` | `/api/info?sha256=` | 查询文件信息与下载次数 |
+| `GET` | `/healthz` | 健康检查，不占 API 限额 |
 
-管理接口（文件、黑名单、限速、安全设置、目录浏览）均挂在随机入口前缀下，且需要登录会话，不在公开 API 之内。
+**健康检查**（`/healthz`）不计入 API 限流，也不写下载日志，可用于 systemd / Nginx / 监控系统探活：
+
+```bash
+curl http://localhost:3000/healthz
+# => {"status":"ok","db":"ok","uptimeSeconds":128}
+```
+
+数据库不可用时返回 `503` 与 `{"status":"degraded","db":"error"}`。
+
+管理接口（文件、黑名单、白名单、限速、安全设置、目录浏览、审计）均挂在随机入口前缀下，且需要登录会话，不在公开 API 之内。
 
 ## 架构
 
@@ -317,7 +364,7 @@ curl "http://localhost:3000/api/info?sha256=<sha256>"
 
 分层约定为 `routes → services → db/repos`：路由层不写 SQL，仓储层不处理 HTTP 语义。数据库、配置与安全设置都经仓储层落到 SQLite；并发计数、令牌桶、限流窗口是进程内状态（因此当前实现面向单进程部署）。
 
-七个数据表：`files`、`links`、`ip_blacklist`、`admin_sessions`、`config`、`login_failures`、`access_logs`。
+九个数据表：`files`、`links`、`ip_blacklist`、`ip_whitelist`、`admin_sessions`、`config`、`login_failures`、`access_logs`、`audit_logs`。
 
 ## 开发
 
@@ -332,11 +379,11 @@ npm test           # 运行测试
 ### 测试
 
 ```bash
-npm test                            # 全部 39 个用例
+npm test                            # 全部 99 个用例
 node --test test/api.test.js        # 单个文件
 ```
 
-测试基于内置 `node:test` + `node:assert/strict`，覆盖短码生成与校验、真实 IP 判定、Range 解析、目录浏览缓存与 LRU、安全设置校验、以及公开 API 与管理路由的集成行为。新增功能请附带测试，详见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
+测试基于内置 `node:test` + `node:assert/strict`，覆盖短码生成与校验、真实 IP 判定、Range 解析、CIDR 匹配与 IP 白名单豁免、限流窗口有界、磁盘与网卡采样解析、文件列表查询与失效检测、审计记录，以及公开 API 与管理路由的集成行为。新增功能请附带测试，详见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
 
 ### 项目结构
 
@@ -346,8 +393,8 @@ src/
   index.js            启动入口：建表、装载设置、打印凭据、定时清理、优雅退出
   config/             常量、运行时可调配置、命令行解析
   db/                 node:sqlite 连接、表结构、仓储层
-  core/               短码、流式哈希、真实 IP、444 断连、并发计数、令牌桶限速、API 限流
-  services/           文件、链接、目录浏览、登录鉴权、安全设置
+  core/               短码、流式哈希、真实 IP、CIDR 匹配、444 断连、并发计数、令牌桶限速、API 限流
+  services/           文件、链接、目录浏览、登录鉴权、安全设置、系统监控、审计
   routes/             下载路由、公开 API、管理后台
   middleware/         会话鉴权与错误处理
   utils/              日志、Range 解析、参数校验
