@@ -6,6 +6,7 @@
 
 把服务器上已有的文件登记进来，即可获得随机短码下载链接 —— 支持断点续传、IP 黑名单、按 IP 的并发与带宽限速，附带一个入口随机、密码随机、带图形验证码的管理控制台。
 
+[![GitHub](https://img.shields.io/badge/GitHub-EndlessPixel%2FFileLink-181717.svg?logo=github&logoColor=white)](https://github.com/EndlessPixel/FileLink)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.5-339933.svg?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![Tests](https://img.shields.io/badge/tests-99%20passing-brightgreen.svg)](#测试)
@@ -451,5 +452,7 @@ curl -o /dev/null -w 'via cdn ttfb=%{time_starttransfer}\n' https://your.domain/
 <div align="center">
 
 **如果这个项目对你有帮助，欢迎点一个 Star。**
+
+[github.com/EndlessPixel/FileLink](https://github.com/EndlessPixel/FileLink)
 
 </div>
