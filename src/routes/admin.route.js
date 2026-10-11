@@ -4,6 +4,7 @@ import express, { Router } from 'express';
 import { SESSION_COOKIE } from '../config/constants.js';
 import * as configStore from '../config/store.js';
 import * as blacklistRepo from '../db/repos/blacklist.repo.js';
+import * as whitelistRepo from '../db/repos/whitelist.repo.js';
 import { requireAuth } from '../middleware/adminAuth.js';
 import * as accessLogService from '../services/accessLogService.js';
 import { attemptLogin, destroySession, issueCaptcha, readSession } from '../services/authService.js';
@@ -14,7 +15,7 @@ import * as securityService from '../services/securityService.js';
 import * as siteFilesService from '../services/siteFilesService.js';
 import * as systemMonitor from '../services/systemMonitor.js';
 import { getStats, listFilesWithLinks, refreshLink } from '../services/linkService.js';
-import { isIpAddress, isSha256, normalizeSha256, toNonNegativeInt } from '../utils/validate.js';
+import { isIpRule, isSha256, normalizeSha256, toNonNegativeInt } from '../utils/validate.js';
 
 const SPEED_MAX_BPS = 10_000_000_000;
 const CONCURRENCY_MAX = 512;
@@ -188,8 +189,8 @@ export function createAdminRouter() {
 
   router.post('/api/blacklist', (req, res) => {
     const ip = String(req.body?.ip ?? '').trim();
-    if (!isIpAddress(ip)) {
-      res.status(400).json({ error: 'invalid_ip', message: '请输入合法的 IPv4 或 IPv6 地址' });
+    if (!isIpRule(ip)) {
+      res.status(400).json({ error: 'invalid_ip', message: '请输入合法的 IP 或 CIDR 网段' });
       return;
     }
     blacklistRepo.addToBlacklist(ip, String(req.body?.reason ?? '').slice(0, 200), Date.now());
@@ -198,11 +199,36 @@ export function createAdminRouter() {
 
   router.delete('/api/blacklist/:ip', (req, res) => {
     const ip = String(req.params.ip ?? '').trim();
-    if (!isIpAddress(ip)) {
+    if (!isIpRule(ip)) {
       res.status(400).json({ error: 'invalid_ip' });
       return;
     }
     blacklistRepo.removeFromBlacklist(ip);
+    res.json({ ok: true });
+  });
+
+  // ---- IP 白名单：不受并发上限与带宽限速约束 ----
+  router.get('/api/whitelist', (_req, res) => {
+    res.json({ entries: whitelistRepo.listWhitelist() });
+  });
+
+  router.post('/api/whitelist', (req, res) => {
+    const ip = String(req.body?.ip ?? '').trim();
+    if (!isIpRule(ip)) {
+      res.status(400).json({ error: 'invalid_ip', message: '请输入合法的 IP 或 CIDR 网段' });
+      return;
+    }
+    whitelistRepo.addToWhitelist(ip, String(req.body?.reason ?? '').slice(0, 200), Date.now());
+    res.json({ ok: true, ip });
+  });
+
+  router.delete('/api/whitelist/:ip', (req, res) => {
+    const ip = String(req.params.ip ?? '').trim();
+    if (!isIpRule(ip)) {
+      res.status(400).json({ error: 'invalid_ip' });
+      return;
+    }
+    whitelistRepo.removeFromWhitelist(ip);
     res.json({ ok: true });
   });
 
