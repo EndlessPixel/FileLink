@@ -146,6 +146,29 @@ export function statsLogs(filters = {}) {
   };
 }
 
+/** 按天聚合的下载趋势（趋势图数据源） */
+export function dailyTrend(days = 14, now = Date.now()) {
+  const since = now - Math.max(Math.trunc(days) || 1, 1) * 24 * 60 * 60 * 1000;
+  const rows = all(
+    `SELECT date(created_at / 1000, 'unixepoch', 'localtime') AS day,
+            COUNT(*) AS requests,
+            SUM(CASE WHEN code IN (200, 206) THEN 1 ELSE 0 END) AS downloads,
+            COALESCE(SUM(bytes_sent), 0) AS bytes
+     FROM access_logs
+     WHERE created_at >= ?
+     GROUP BY day
+     ORDER BY day ASC`,
+    Math.trunc(since)
+  );
+
+  return rows.map((row) => ({
+    day: row.day,
+    requests: Number(row.requests),
+    downloads: Number(row.downloads),
+    bytes: Number(row.bytes),
+  }));
+}
+
 /** 清理过期日志 */
 export function deleteLogsBefore(timestamp) {
   return run('DELETE FROM access_logs WHERE created_at < ?', Math.trunc(timestamp)).changes;

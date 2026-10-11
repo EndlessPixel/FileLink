@@ -45,6 +45,7 @@ export const api = {
 
   stats: () => request('stats'),
   networkMonitor: () => request('monitor/network'),
+  systemMonitor: () => request('monitor/system'),
   files: () => request('files'),
   addFile: (path) => request('files', { method: 'POST', body: { path } }),
   deleteFile: (sha256) => request(`files/${sha256}`, { method: 'DELETE' }),
@@ -62,6 +63,7 @@ export const api = {
   saveConfig: (payload) => request('config', { method: 'PUT', body: payload }),
 
   logs: (params) => request(`logs?${new URLSearchParams(params).toString()}`),
+  logsTrend: (days) => request(`logs/trend?days=${encodeURIComponent(days)}`),
 
   siteFiles: () => request('site-files'),
   saveRobots: (payload) => request('site-files/robots', { method: 'PUT', body: payload }),

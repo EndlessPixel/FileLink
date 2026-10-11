@@ -52,6 +52,7 @@ export const DEFAULT_CONFIG = {
   login_max_failures: '3',
   login_ban_seconds: '300',
   log_retention_days: '30',
+  disk_alert_percent: '90',
 };
 
 /** 数值型配置项集合（读取时转 number） */

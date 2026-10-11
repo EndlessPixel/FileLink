@@ -6,6 +6,14 @@ const props = defineProps({
   points: { type: Array, default: () => [] },
   height: { type: Number, default: 260 },
   intervalMs: { type: Number, default: 5000 },
+  /** 曲线定义：key 对应数据字段，color/label 用于绘制与图例 */
+  series: {
+    type: Array,
+    default: () => [
+      { key: 'rx', color: '#22d3ee', label: '下行（接收）' },
+      { key: 'tx', color: '#818cf8', label: '上行（发送）' },
+    ],
+  },
 });
 
 const wrapper = ref(null);
@@ -14,7 +22,8 @@ let observer = null;
 
 /** Y 轴刻度取整到 1/2/5 × 10ⁿ，并留出 12% 余量 */
 const chartMax = computed(() => {
-  const values = props.points.flatMap((point) => [point.rx, point.tx]);
+  const keys = props.series.map((item) => item.key);
+  const values = props.points.flatMap((point) => keys.map((key) => Number(point[key]) || 0));
   const raw = Math.max(...values, 1) * 1.12;
   const magnitude = 10 ** Math.floor(Math.log10(raw));
   const normalized = raw / magnitude;
@@ -37,7 +46,7 @@ const gridLines = computed(() =>
 
 function pointAt(point, key, index, stepX) {
   const x = index * stepX;
-  const ratio = Math.min(point[key] / chartMax.value, 1);
+  const ratio = Math.min((Number(point[key]) || 0) / chartMax.value, 1);
   return { x, y: padTop + usableHeight.value * (1 - ratio) };
 }
 
@@ -59,10 +68,16 @@ function buildArea(key) {
   return `${line} L${width.value},${baseY.value} L0,${baseY.value} Z`;
 }
 
-const rxLine = computed(() => buildLine('rx'));
-const txLine = computed(() => buildLine('tx'));
-const rxArea = computed(() => buildArea('rx'));
-const txArea = computed(() => buildArea('tx'));
+const seriesPaths = computed(() =>
+  props.series.map((item) => ({
+    key: item.key,
+    color: item.color,
+    label: item.label,
+    gradientId: `rate-fill-${item.key}`,
+    line: buildLine(item.key),
+    area: buildArea(item.key),
+  }))
+);
 
 const spanLabel = computed(() => {
   const seconds = Math.round((props.points.length * props.intervalMs) / 1000);
@@ -90,13 +105,17 @@ onBeforeUnmount(() => {
   <div ref="wrapper" class="relative w-full">
     <svg :viewBox="`0 0 ${width} ${height}`" :height="height" class="w-full" role="img">
       <defs>
-        <linearGradient id="rx-fill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.32" />
-          <stop offset="100%" stop-color="#22d3ee" stop-opacity="0" />
-        </linearGradient>
-        <linearGradient id="tx-fill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#818cf8" stop-opacity="0.28" />
-          <stop offset="100%" stop-color="#818cf8" stop-opacity="0" />
+        <linearGradient
+          v-for="item in seriesPaths"
+          :id="item.gradientId"
+          :key="item.gradientId"
+          x1="0"
+          y1="0"
+          x2="0"
+          y2="1"
+        >
+          <stop offset="0%" :stop-color="item.color" stop-opacity="0.3" />
+          <stop offset="100%" :stop-color="item.color" stop-opacity="0" />
         </linearGradient>
       </defs>
 
@@ -113,23 +132,15 @@ onBeforeUnmount(() => {
         />
       </g>
 
-      <path v-if="rxArea" :d="rxArea" fill="url(#rx-fill)" />
-      <path v-if="txArea" :d="txArea" fill="url(#tx-fill)" />
+      <path v-for="item in seriesPaths" v-if="item.area" :key="`area-${item.key}`" :d="item.area" :fill="`url(#${item.gradientId})`" />
 
       <path
-        v-if="rxLine"
-        :d="rxLine"
+        v-for="item in seriesPaths"
+        v-if="item.line"
+        :key="`line-${item.key}`"
+        :d="item.line"
         fill="none"
-        stroke="#22d3ee"
-        stroke-width="1.8"
-        stroke-linejoin="round"
-        stroke-linecap="round"
-      />
-      <path
-        v-if="txLine"
-        :d="txLine"
-        fill="none"
-        stroke="#818cf8"
+        :stroke="item.color"
         stroke-width="1.8"
         stroke-linejoin="round"
         stroke-linecap="round"
@@ -160,11 +171,8 @@ onBeforeUnmount(() => {
     <div class="mt-2 flex items-center justify-between px-0.5 text-[11px] text-fg-dim">
       <span>最近 {{ spanLabel }}</span>
       <span class="flex items-center gap-3">
-        <span class="flex items-center gap-1.5">
-          <span class="size-2 rounded-full bg-accent-400"></span>下行（接收）
-        </span>
-        <span class="flex items-center gap-1.5">
-          <span class="size-2 rounded-full bg-brand-400"></span>上行（发送）
+        <span v-for="item in seriesPaths" :key="`legend-${item.key}`" class="flex items-center gap-1.5">
+          <span class="size-2 rounded-full" :style="{ backgroundColor: item.color }"></span>{{ item.label }}
         </span>
       </span>
     </div>

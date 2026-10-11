@@ -5,6 +5,7 @@ import api, { downloadLogsCsv } from '../api.js';
 import { toast } from '../toast.js';
 import { formatSize } from '../format.js';
 import LogsTable from '../components/LogsTable.vue';
+import TrendChart from '../components/TrendChart.vue';
 
 const RANGES = [
   { value: 'all', label: '全部时间' },
@@ -13,6 +14,12 @@ const RANGES = [
   { value: 'month', label: '本月' },
   { value: 'year', label: '本年' },
   { value: 'custom', label: '自定义' },
+];
+
+const TREND_RANGES = [
+  { value: 7, label: '最近 7 天' },
+  { value: 14, label: '最近 14 天' },
+  { value: 30, label: '最近 30 天' },
 ];
 
 const CODES = [
@@ -35,6 +42,8 @@ const loading = ref(true);
 const refreshing = ref(false);
 const exporting = ref(false);
 const data = ref(null);
+const trendDays = ref(14);
+const trend = ref(null);
 
 const filters = reactive({
   q: '',
@@ -144,6 +153,16 @@ async function exportCsv() {
   }
 }
 
+async function loadTrend() {
+  try {
+    trend.value = await api.logsTrend(trendDays.value);
+  } catch (error) {
+    toast.error(error.message);
+  }
+}
+
+watch(trendDays, loadTrend);
+
 let debounce = null;
 watch(
   () => filters.q,
@@ -169,7 +188,10 @@ watch(
   () => load(true)
 );
 
-onMounted(load);
+onMounted(() => {
+  load();
+  loadTrend();
+});
 onBeforeUnmount(() => clearTimeout(debounce));
 </script>
 
@@ -188,6 +210,24 @@ onBeforeUnmount(() => clearTimeout(debounce));
           {{ card.value }}
         </p>
         <p class="mt-2 truncate text-[11px] text-fg-dim">{{ card.hint }}</p>
+      </div>
+    </div>
+
+    <div class="glass-card p-5">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 class="text-sm font-semibold text-fg">下载趋势</h3>
+          <p class="mt-0.5 text-[12px] text-fg-dim">
+            近 {{ trend?.days ?? trendDays }} 天共 {{ trend?.totals?.requests ?? 0 }} 次请求 ·
+            {{ trend?.totals?.downloads ?? 0 }} 次完成下载 · {{ formatSize(trend?.totals?.bytes ?? 0) }} 流量
+          </p>
+        </div>
+        <select v-model.number="trendDays" class="field w-auto min-w-[130px] cursor-pointer">
+          <option v-for="item in TREND_RANGES" :key="item.value" :value="item.value">{{ item.label }}</option>
+        </select>
+      </div>
+      <div class="mt-4">
+        <TrendChart :points="trend?.points ?? []" />
       </div>
     </div>
 

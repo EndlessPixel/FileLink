@@ -26,7 +26,7 @@ import LogsView from './views/LogsView.vue';
 const tabs = [
   { id: 'files', label: '文件管理', hint: '登记与分发', icon: Files, view: FilesView },
   { id: 'logs', label: '下载日志', hint: '请求与统计', icon: FileClock, view: LogsView },
-  { id: 'monitor', label: '系统监控', hint: '网络流量', icon: Activity, view: MonitorView },
+  { id: 'monitor', label: '系统监控', hint: '磁盘与流量', icon: Activity, view: MonitorView },
   { id: 'blacklist', label: 'IP 黑名单', hint: '访问拦截', icon: ShieldBan, view: BlacklistView },
   { id: 'settings', label: '限速与设置', hint: '带宽控制', icon: Sliders, view: SettingsView },
   { id: 'security', label: '安全设置', hint: '入口与密码', icon: ShieldCheck, view: SecurityView },
