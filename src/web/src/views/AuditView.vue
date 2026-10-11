@@ -171,7 +171,9 @@ onMounted(load);
               <td class="max-w-[320px] px-4 py-3.5 text-fg-muted">
                 <span class="block truncate" :title="log.detail">{{ log.detail || '—' }}</span>
               </td>
-              <td class="px-5 py-3.5 font-mono text-[12px] text-fg-muted">{{ log.ip || '—' }}</td>
+              <td class="max-w-[200px] px-5 py-3.5">
+                <span class="block truncate font-mono text-[12px] text-fg-muted" :title="log.ip">{{ log.ip || '—' }}</span>
+              </td>
             </tr>
           </tbody>
         </table>

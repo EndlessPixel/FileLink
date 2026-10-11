@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { Ban, Database, Download, FileClock, Loader2, RefreshCw, Search, Users } from 'lucide-vue-next';
 import api, { downloadLogsCsv } from '../api.js';
 import { toast } from '../toast.js';
-import { formatSize } from '../format.js';
+import { formatSize, shortIp } from '../format.js';
 import LogsTable from '../components/LogsTable.vue';
 import TrendChart from '../components/TrendChart.vue';
 
@@ -63,19 +63,24 @@ const pagination = computed(
 );
 const stats = computed(() => data.value?.stats ?? { total: 0, bytes: 0, disconnects: 0, topIps: [] });
 
-const cards = computed(() => [
-  { label: '下载请求', value: String(stats.value.total), hint: '当前筛选条件下', icon: FileClock, tone: 'text-brand-300' },
-  { label: '累计流量', value: formatSize(stats.value.bytes), hint: '已发送字节数', icon: Database, tone: 'text-accent-400' },
-  { label: '444 断连', value: String(stats.value.disconnects), hint: '非法或不存在的短码', icon: Ban, tone: 'text-danger' },
-  {
-    label: 'Top IP',
-    value: stats.value.topIps[0] ? stats.value.topIps[0].ip : '—',
-    hint: stats.value.topIps[0] ? `${stats.value.topIps[0].count} 次请求` : '暂无数据',
-    icon: Users,
-    tone: 'text-warn',
-    mono: true,
-  },
-]);
+const cards = computed(() => {
+  const topIp = stats.value.topIps[0] ?? null;
+  return [
+    { label: '下载请求', value: String(stats.value.total), hint: '当前筛选条件下', icon: FileClock, tone: 'text-brand-300' },
+    { label: '累计流量', value: formatSize(stats.value.bytes), hint: '已发送字节数', icon: Database, tone: 'text-accent-400' },
+    { label: '444 断连', value: String(stats.value.disconnects), hint: '非法或不存在的短码', icon: Ban, tone: 'text-danger' },
+    {
+      label: 'Top IP',
+      // IPv6 完整地址过长会撑破卡片，用摘要形式展示，完整值放进 title
+      value: topIp ? shortIp(topIp.ip) : '—',
+      title: topIp?.ip ?? '',
+      hint: topIp ? `${topIp.count} 次请求` : '暂无数据',
+      icon: Users,
+      tone: 'text-warn',
+      mono: true,
+    },
+  ];
+});
 
 /** 时间范围按浏览器本地时区换算成时间戳，避免服务器时区造成的偏差 */
 function resolveRange() {
@@ -198,14 +203,15 @@ onBeforeUnmount(() => clearTimeout(debounce));
 <template>
   <div class="space-y-6">
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <div v-for="card in cards" :key="card.label" class="glass-card p-5">
+      <div v-for="card in cards" :key="card.label" class="glass-card min-w-0 p-5">
         <div class="flex items-center justify-between">
           <p class="text-[13px] text-fg-muted">{{ card.label }}</p>
-          <component :is="card.icon" class="size-4.5" :class="card.tone" />
+          <component :is="card.icon" class="size-4.5 shrink-0" :class="card.tone" />
         </div>
         <p
-          class="mt-3 text-[24px] leading-none font-semibold text-fg"
+          class="mt-3 truncate text-[24px] leading-none font-semibold text-fg"
           :class="card.mono ? 'font-mono text-[18px]' : 'font-mono'"
+          :title="card.title || undefined"
         >
           {{ card.value }}
         </p>
