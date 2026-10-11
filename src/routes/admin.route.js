@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import express, { Router } from 'express';
 import { SESSION_COOKIE } from '../config/constants.js';
 import * as configStore from '../config/store.js';
@@ -266,7 +266,26 @@ export function createAdminRouter() {
 
   // ---- 静态资源与 SPA 入口 ----
   if (existsSync(indexPath)) {
-    router.use(express.static(webDist, { index: false, dotfiles: 'deny', fallthrough: true }));
+    router.use(
+      express.static(webDist, {
+        index: false,
+        dotfiles: 'deny',
+        fallthrough: true,
+        setHeaders(res, filePath) {
+          // 入口不缓存：发版后浏览器必须立刻拿到新的资源引用
+          if (filePath.endsWith('index.html')) {
+            res.setHeader('Cache-Control', 'no-store');
+            return;
+          }
+          // Vite 产物文件名带内容哈希，可以长期强缓存
+          if (filePath.includes(`${sep}assets${sep}`)) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            return;
+          }
+          res.setHeader('Cache-Control', 'public, max-age=3600');
+        },
+      })
+    );
     router.get('/', (_req, res) => {
       res.set('Cache-Control', 'no-store');
       res.sendFile(indexPath);
