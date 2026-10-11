@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
-import { Gauge, Info, Loader2, Minus, PlugZap, Plus, Save, Server, ShieldCheck } from 'lucide-vue-next';
+import { Gauge, Info, Loader2, Minus, PlugZap, Plus, Save, Server, ShieldAlert, ShieldCheck } from 'lucide-vue-next';
 import api from '../api.js';
 import { toast } from '../toast.js';
 import { bpsToMbps, formatSize, mbpsToBps } from '../format.js';
@@ -10,6 +10,7 @@ const saving = ref(false);
 const speedMbps = ref(1);
 const concurrency = ref(16);
 const apiLimit = ref(30);
+const diskAlert = ref(90);
 
 const speedBytes = computed(() => mbpsToBps(speedMbps.value));
 const speedReadable = computed(() => `${formatSize(speedBytes.value)} / 秒`);
@@ -22,6 +23,7 @@ async function load() {
     speedMbps.value = bpsToMbps(config.max_speed_bps);
     concurrency.value = Number(config.max_concurrent_downloads) || 16;
     apiLimit.value = Number(config.api_rate_limit_per_min) || 30;
+    diskAlert.value = Number(config.disk_alert_percent) || 90;
   } catch (error) {
     toast.error(error.message);
   } finally {
@@ -34,15 +36,22 @@ function stepConcurrency(delta) {
   concurrency.value = Math.min(Math.max(next, 1), 512);
 }
 
+function stepDiskAlert(delta) {
+  const next = Number(diskAlert.value) + delta;
+  diskAlert.value = Math.min(Math.max(next, 50), 100);
+}
+
 async function save() {
   saving.value = true;
   try {
     const data = await api.saveConfig({
       max_speed_bps: mbpsToBps(speedMbps.value),
       max_concurrent_downloads: Number(concurrency.value),
+      disk_alert_percent: Number(diskAlert.value),
     });
     speedMbps.value = bpsToMbps(data.config.max_speed_bps);
     concurrency.value = Number(data.config.max_concurrent_downloads);
+    diskAlert.value = Number(data.config.disk_alert_percent);
     toast.success('配置已保存并立即生效，无需重启服务');
   } catch (error) {
     toast.error(error.message);
@@ -129,6 +138,41 @@ onMounted(load);
             <Plus class="size-4" />
           </button>
           <span class="text-[13px] text-fg-muted">条（默认 16，范围 1 – 512）</span>
+        </div>
+      </div>
+
+      <div class="glass-card p-5">
+        <div class="flex items-start gap-3.5">
+          <span class="flex size-11 items-center justify-center rounded-xl bg-warn/12 text-warn">
+            <ShieldAlert class="size-5" />
+          </span>
+          <div class="flex-1">
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="text-sm font-semibold text-fg">磁盘告警阈值</h3>
+              <span class="badge border border-line bg-white/3 font-mono text-fg-muted">{{ diskAlert }}%</span>
+            </div>
+            <p class="mt-1 text-[12px] text-fg-dim">
+              系统监控页在磁盘使用率超过该值时标红提示，范围 50 – 100
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-6 flex items-center gap-3">
+          <button class="icon-btn size-9 border-line bg-white/3" type="button" @click="stepDiskAlert(-5)">
+            <Minus class="size-4" />
+          </button>
+          <input
+            v-model.number="diskAlert"
+            class="field w-[110px] text-center font-mono"
+            type="number"
+            min="50"
+            max="100"
+            step="1"
+          />
+          <button class="icon-btn size-9 border-line bg-white/3" type="button" @click="stepDiskAlert(5)">
+            <Plus class="size-4" />
+          </button>
+          <span class="text-[13px] text-fg-muted">%（默认 90）</span>
         </div>
       </div>
 
