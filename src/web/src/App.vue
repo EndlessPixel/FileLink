@@ -10,6 +10,7 @@ import {
   ShieldBan,
   ShieldCheck,
   Sliders,
+  Zap,
 } from 'lucide-vue-next';
 import api, { setUnauthorizedHandler } from './api.js';
 import { formatDuration } from './format.js';
@@ -18,6 +19,7 @@ import ToastHost from './components/ToastHost.vue';
 import LoginView from './views/LoginView.vue';
 import FilesView from './views/FilesView.vue';
 import BlacklistView from './views/BlacklistView.vue';
+import WhitelistView from './views/WhitelistView.vue';
 import SettingsView from './views/SettingsView.vue';
 import SecurityView from './views/SecurityView.vue';
 import MonitorView from './views/MonitorView.vue';
@@ -28,6 +30,7 @@ const tabs = [
   { id: 'logs', label: '下载日志', hint: '请求与统计', icon: FileClock, view: LogsView },
   { id: 'monitor', label: '系统监控', hint: '磁盘与流量', icon: Activity, view: MonitorView },
   { id: 'blacklist', label: 'IP 黑名单', hint: '访问拦截', icon: ShieldBan, view: BlacklistView },
+  { id: 'whitelist', label: 'IP 白名单', hint: '免限速豁免', icon: Zap, view: WhitelistView },
   { id: 'settings', label: '限速与设置', hint: '带宽控制', icon: Sliders, view: SettingsView },
   { id: 'security', label: '安全设置', hint: '入口与密码', icon: ShieldCheck, view: SecurityView },
 ];
