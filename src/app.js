@@ -2,6 +2,7 @@ import cookieParser from 'cookie-parser';
 import express from 'express';
 import helmet from 'helmet';
 import { getClientIp } from './core/clientIp.js';
+import { get as dbGet } from './db/index.js';
 import { createAdminRouter } from './routes/admin.route.js';
 import { createApiRouter } from './routes/api.route.js';
 import { createDownloadRouter } from './routes/download.route.js';
@@ -48,6 +49,25 @@ export function createApp({ sessionSecret }) {
   });
 
   app.use(cookieParser(sessionSecret));
+
+  // 健康检查：不占用 API 限流额度，也不写下载日志，仅回基础存活状态
+  app.get('/healthz', (_req, res) => {
+    let db = 'ok';
+    try {
+      dbGet('SELECT 1 AS ok');
+    } catch {
+      db = 'error';
+    }
+    const healthy = db === 'ok';
+    res
+      .status(healthy ? 200 : 503)
+      .set('Cache-Control', 'no-store')
+      .json({
+        status: healthy ? 'ok' : 'degraded',
+        db,
+        uptimeSeconds: Math.round(process.uptime()),
+      });
+  });
 
   app.use('/d', createDownloadRouter());
   app.use('/api', express.json({ limit: '16kb' }), createApiRouter());
